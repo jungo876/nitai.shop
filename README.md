@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NCK Agro — B2B Pesticide Distribution
+
+A modern, mobile-first web application for B2B pesticide distribution with WhatsApp ordering integration.
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router)
+- **Styling**: Tailwind CSS v4
+- **Database**: Supabase (PostgreSQL)
+- **Image Storage**: Supabase Storage
+- **Deployment**: Vercel-ready
+
+## Features
+
+- ✅ **Public Product Catalog** — Browse products with category filtering
+- ✅ **WhatsApp Ordering** — One-click order via prefilled WhatsApp messages
+- ✅ **Admin Panel** — Add products with image upload
+- ✅ **Responsive Design** — Mobile-first, works on all devices
+- ✅ **Dark Mode** — Automatic dark mode based on system preference
 
 ## Getting Started
 
-First, run the development server:
+### 1. Supabase Setup
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Run the SQL from `supabase/setup.sql` in the **SQL Editor**
+3. Create a **Storage bucket** called `product-images` and make it **public**
+4. Add a storage policy to allow anonymous uploads (see SQL file for details)
+
+### 2. Environment Variables
+
+Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+NEXT_PUBLIC_WHATSAPP_NUMBER=919999999999
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Install & Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+### 4. Deploy to Vercel
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx vercel
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Add the same environment variables in Vercel's project settings.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── products/route.ts   # GET/POST products
+│   │   └── upload/route.ts     # Image upload to Supabase Storage
+│   ├── admin/page.tsx           # Admin form to add products
+│   ├── layout.tsx               # Root layout with Navbar & Footer
+│   ├── page.tsx                 # Home page with hero & product grid
+│   └── globals.css              # Design system & custom animations
+├── components/
+│   ├── Navbar.tsx               # Responsive navigation
+│   ├── ProductCard.tsx          # Product card with WhatsApp button
+│   ├── ProductGrid.tsx          # Grid with category filters
+│   └── Footer.tsx               # Site footer
+└── lib/
+    ├── supabase.ts              # Supabase client
+    └── types.ts                 # TypeScript types & constants
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API Routes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Method | Endpoint         | Description            |
+| ------ | ---------------- | ---------------------- |
+| GET    | `/api/products`  | Fetch all products     |
+| POST   | `/api/products`  | Create a new product   |
+| POST   | `/api/upload`    | Upload image to storage|
+
+## License
+
+MIT
