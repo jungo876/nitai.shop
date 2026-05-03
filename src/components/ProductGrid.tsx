@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Product } from "@/lib/types";
+import type { ProductWithVariants } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
 import { useLanguage } from "@/context/LanguageContext";
 import { categoryKeyMap } from "@/lib/translations";
 import ProductCard from "./ProductCard";
 
 export default function ProductGrid() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -19,8 +19,7 @@ export default function ProductGrid() {
       try {
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Failed to fetch products");
-        const data = await res.json();
-        setProducts(data);
+        setProducts(await res.json());
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
@@ -30,29 +29,18 @@ export default function ProductGrid() {
     fetchProducts();
   }, []);
 
-  const filteredProducts =
-    activeCategory === "All"
-      ? products
-      : products.filter((p) => p.category === activeCategory);
-
-  const availableCategories = [
-    "All",
-    ...CATEGORIES.filter((cat) => products.some((p) => p.category === cat)),
-  ];
+  const filteredProducts = activeCategory === "All" ? products : products.filter((p) => p.category === activeCategory);
+  const availableCategories = ["All", ...CATEGORIES.filter((cat) => products.some((p) => p.category === cat))];
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-2xl border border-card-border bg-card-bg overflow-hidden"
-          >
+          <div key={i} className="rounded-2xl border border-card-border bg-card-bg overflow-hidden">
             <div className="aspect-[4/3] animate-shimmer" />
             <div className="p-5 space-y-3">
               <div className="h-5 w-3/4 rounded-lg animate-shimmer" />
               <div className="h-4 w-full rounded-lg animate-shimmer" />
-              <div className="h-4 w-2/3 rounded-lg animate-shimmer" />
               <div className="h-11 w-full rounded-xl animate-shimmer mt-4" />
             </div>
           </div>
@@ -97,27 +85,17 @@ export default function ProductGrid() {
 
   return (
     <div>
-      {/* Category Filters */}
       <div className="mb-8 flex flex-wrap gap-2">
         {availableCategories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
+          <button key={cat} onClick={() => setActiveCategory(cat)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
-              activeCategory === cat
-                ? "bg-primary text-white shadow-md shadow-primary/25"
-                : "bg-surface text-muted hover:text-foreground hover:bg-card-border"
-            }`}
-          >
+              activeCategory === cat ? "bg-primary text-white shadow-md shadow-primary/25" : "bg-surface text-muted hover:text-foreground hover:bg-card-border"
+            }`}>
             {getCategoryLabel(cat)}
-            {cat === "All" && (
-              <span className="ml-1.5 text-xs opacity-70">({products.length})</span>
-            )}
+            {cat === "All" && <span className="ml-1.5 text-xs opacity-70">({products.length})</span>}
           </button>
         ))}
       </div>
-
-      {/* Grid */}
       {filteredProducts.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-muted text-sm">{t("products_no_category")}</p>
