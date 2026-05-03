@@ -23,6 +23,42 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(true);
   const [fetchingMore, setFetchingMore] = useState(false);
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<ProductWithVariants[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchOffset, setSearchOffset] = useState(0);
+  const [searchHasMore, setSearchHasMore] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!debouncedSearch.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    async function doSearch() {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=10&offset=0`);
+        const data = await res.json();
+        setSearchResults(data || []);
+        setSearchOffset(0);
+        setSearchHasMore(data?.length === 10);
+      } catch (err) {
+        console.error("Search failed", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+    doSearch();
+  }, [debouncedSearch]);
+
   useEffect(() => {
     async function fetchCompanies() {
       try {
@@ -95,9 +131,87 @@ export default function HomePage() {
     }
   }
 
+  async function handleLoadMoreSearch() {
+    setFetchingMore(true);
+    const nextOffset = searchOffset + 10;
+    try {
+      const res = await fetch(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=10&offset=${nextOffset}`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        setSearchResults(prev => [...prev, ...data]);
+        setSearchOffset(nextOffset);
+        if (data.length < 10) setSearchHasMore(false);
+      } else {
+        setSearchHasMore(false);
+      }
+    } catch (err) {
+      console.error("Search load more failed", err);
+    } finally {
+      setFetchingMore(false);
+    }
+  }
+
   return (
     <>
-      <HeroCarousel />
+      {/* Search Bar */}
+      <div className="bg-background pt-8 pb-4">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="relative max-w-2xl mx-auto">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+              <svg className="h-5 w-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search products, company..."
+              className="block w-full rounded-2xl border border-card-border bg-surface py-3.5 pl-11 pr-4 text-foreground placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm("")} className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted hover:text-foreground transition-colors">
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {debouncedSearch.trim() ? (
+        <section className="bg-background pt-10 pb-20 min-h-[50vh]">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl mb-10">Search Results for "{debouncedSearch}"</h2>
+            
+            {isSearching ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-64 rounded-3xl bg-card-bg border border-card-border animate-shimmer" />)}
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center py-16 bg-surface rounded-3xl border border-card-border border-dashed">
+                <p className="text-muted font-medium">No products found matching your search.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {searchResults.map((product, index) => (
+                    <ProductCard key={product.id} product={product} index={index} />
+                  ))}
+                </div>
+                {searchHasMore && (
+                  <div className="mt-12 text-center">
+                    <button onClick={handleLoadMoreSearch} disabled={fetchingMore} className="inline-flex items-center justify-center rounded-2xl bg-surface px-8 py-3.5 text-sm font-semibold text-foreground border border-card-border hover:border-primary/50 hover:text-primary disabled:opacity-50 transition-all shadow-sm">
+                      {fetchingMore ? "Loading..." : "See More"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      ) : (
+        <>
+          <HeroCarousel />
 
       <section className="border-y border-card-border bg-card-bg/50">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -239,6 +353,8 @@ export default function HomePage() {
           )}
         </div>
       </section>
+        </>
+      )}
     </>
   );
 }

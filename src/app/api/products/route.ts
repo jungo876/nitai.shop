@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const topSelling = searchParams.get("top_selling");
     const limitParam = searchParams.get("limit");
     const offsetParam = searchParams.get("offset");
+    const search = searchParams.get("search");
 
     const supabase = getSupabase();
     let query = supabase
@@ -22,6 +23,14 @@ export async function GET(request: Request) {
     }
     if (topSelling === "true") {
       query = query.eq("is_top_selling", true);
+    }
+    if (search) {
+      // Find matching companies first to support OR company.name ILIKE %search%
+      const { data: compData } = await supabase.from("companies").select("id").ilike("name", `%${search}%`);
+      const compIds = compData?.map(c => c.id) || [];
+      
+      const compFilter = compIds.length > 0 ? `,company_id.in.(${compIds.join(",")})` : "";
+      query = query.or(`name.ilike.%${search}%,category.ilike.%${search}%${compFilter}`);
     }
     
     if (limitParam && !isNaN(parseInt(limitParam, 10))) {

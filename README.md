@@ -1,89 +1,105 @@
-# NCK Agro — B2B Pesticide Distribution
+# NCK Agro — B2B Pesticide Distribution Platform
 
-A modern, mobile-first web application for B2B pesticide distribution with WhatsApp ordering integration.
+A Next.js 14 B2B platform for agricultural product distribution with admin panel, company management, bulk pricing, and product discovery features.
 
-## Tech Stack
+---
 
-- **Framework**: Next.js 15 (App Router)
-- **Styling**: Tailwind CSS v4
-- **Database**: Supabase (PostgreSQL)
-- **Image Storage**: Supabase Storage
-- **Deployment**: Vercel-ready
+## 🚀 Getting Started
 
-## Features
-
-- ✅ **Public Product Catalog** — Browse products with category filtering
-- ✅ **WhatsApp Ordering** — One-click order via prefilled WhatsApp messages
-- ✅ **Admin Panel** — Add products with image upload
-- ✅ **Responsive Design** — Mobile-first, works on all devices
-- ✅ **Dark Mode** — Automatic dark mode based on system preference
-
-## Getting Started
-
-### 1. Supabase Setup
-
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run the SQL from `supabase/setup.sql` in the **SQL Editor**
-3. Create a **Storage bucket** called `product-images` and make it **public**
-4. Add a storage policy to allow anonymous uploads (see SQL file for details)
-
-### 2. Environment Variables
-
-Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
+### 1. Clone the repo
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-NEXT_PUBLIC_WHATSAPP_NUMBER=919999999999
+git clone https://github.com/jungo876/nitai.shop.git
+cd nitai.shop
 ```
 
-### 3. Install & Run
+### 2. Install dependencies
 
 ```bash
 npm install
+```
+
+### 3. Set up environment variables
+
+Create a `.env.local` file in the root directory (get values from the project owner):
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+ADMIN_PASSWORD=your_admin_password
+NEXT_PUBLIC_WHATSAPP_NUMBER=your_whatsapp_number
+```
+
+### 4. Set up the database
+
+Run the SQL files in your Supabase SQL editor **in this order**:
+
+1. `supabase/setup.sql` — Creates all base tables (`companies`, `products`, `product_variants`, `bulk_prices`)
+2. `supabase/migration_bulk_prices.sql` — Adds bulk pricing support + `is_top_selling` column
+
+### 5. Run the dev server
+
+```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
-### 4. Deploy to Vercel
+Admin panel: [http://localhost:3000/admin](http://localhost:3000/admin)
 
-```bash
-npx vercel
-```
+---
 
-Add the same environment variables in Vercel's project settings.
-
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 src/
 ├── app/
+│   ├── admin/          # Admin panel (company + product management)
 │   ├── api/
-│   │   ├── products/route.ts   # GET/POST products
-│   │   └── upload/route.ts     # Image upload to Supabase Storage
-│   ├── admin/page.tsx           # Admin form to add products
-│   ├── layout.tsx               # Root layout with Navbar & Footer
-│   ├── page.tsx                 # Home page with hero & product grid
-│   └── globals.css              # Design system & custom animations
+│   │   ├── companies/  # CRUD for companies
+│   │   ├── products/   # CRUD for products (search, pagination, top_selling filter)
+│   │   └── upload/     # Image upload endpoint
+│   ├── company/[id]/   # Dynamic company product page
+│   └── page.tsx        # Homepage (search, top selling, companies, all products)
 ├── components/
-│   ├── Navbar.tsx               # Responsive navigation
-│   ├── ProductCard.tsx          # Product card with WhatsApp button
-│   ├── ProductGrid.tsx          # Grid with category filters
-│   └── Footer.tsx               # Site footer
+│   ├── BulkPricingSelector.tsx
+│   ├── HeroCarousel.tsx
+│   └── ProductCard.tsx
 └── lib/
-    ├── supabase.ts              # Supabase client
-    └── types.ts                 # TypeScript types & constants
+    ├── supabase.ts
+    └── types.ts
 ```
 
-## API Routes
+---
 
-| Method | Endpoint         | Description            |
-| ------ | ---------------- | ---------------------- |
-| GET    | `/api/products`  | Fetch all products     |
-| POST   | `/api/products`  | Create a new product   |
-| POST   | `/api/upload`    | Upload image to storage|
+## ✨ Features
 
-## License
+- **Homepage**: Hero carousel, sticky search bar, Top Selling section, Browse by Company, All Products with pagination
+- **Company Pages**: `/company/[id]` — shows all products for a company
+- **Admin Panel**: Sticky navbar with search, company management (logo upload), product management (variants, bulk pricing, top selling toggle)
+- **Search**: API supports `?search=keyword` with name, category, and company name filtering
+- **Pagination**: `?limit=10&offset=0` with "See More" append loading
 
-MIT
+---
+
+## 🔑 Key API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/products` | List products (supports `?search=`, `?top_selling=true`, `?limit=`, `?offset=`, `?company_id=`) |
+| POST | `/api/products` | Create product |
+| PUT | `/api/products/[id]` | Update product |
+| DELETE | `/api/products/[id]` | Delete product |
+| GET | `/api/companies` | List all companies |
+| POST | `/api/companies` | Create company |
+| DELETE | `/api/companies/[id]` | Delete company |
+| POST | `/api/upload` | Upload image → Supabase Storage |
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Database**: Supabase (PostgreSQL)
+- **Styling**: Tailwind CSS
+- **Language**: TypeScript

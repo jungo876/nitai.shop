@@ -31,6 +31,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [delConfirm, setDelConfirm] = useState<string | null>(null);
   const [prodLoad, setProdLoad] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Company state
@@ -222,18 +223,48 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-card-border bg-card-bg/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-gradient-start to-gradient-end">
-              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 border-b border-card-border bg-background/90 backdrop-blur-xl shadow-sm">
+        <div className="mx-auto flex flex-col sm:flex-row max-w-5xl items-center justify-between px-4 py-3 sm:px-6 gap-3 sm:gap-6">
+          <div className="flex items-center justify-between w-full sm:w-auto shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-gradient-start to-gradient-end shadow-sm">
+                <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+              </div>
+              <span className="font-bold text-foreground text-lg hidden sm:block">Admin Panel</span>
             </div>
-            <span className="font-bold text-foreground">NCK Admin</span>
+            {/* Mobile Actions */}
+            <div className="flex items-center gap-3 sm:hidden">
+              <Link href="/" className="text-sm text-muted hover:text-primary transition-colors">Website</Link>
+              <button onClick={() => setIsAuth(false)} className="rounded-lg border border-card-border px-3 py-1.5 text-sm text-muted hover:text-danger hover:border-danger/30 transition-colors">Logout</button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-sm text-muted hover:text-primary transition-colors">← Website</Link>
-            <button onClick={() => setIsAuth(false)} className="rounded-lg border border-card-border px-3 py-1.5 text-sm text-muted hover:text-danger hover:border-danger/30 transition-colors">Logout</button>
+
+          {/* Search Input */}
+          <div className="relative w-full sm:max-w-md">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+              <svg className="h-4 w-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search products..."
+              className="block w-full rounded-full border border-card-border bg-surface py-2 pl-10 pr-10 text-sm text-foreground placeholder:text-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-sm"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 flex items-center pr-4 text-muted hover:text-foreground">
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Desktop Actions */}
+          <div className="items-center gap-4 hidden sm:flex shrink-0">
+            <Link href="/" className="text-sm font-medium text-muted hover:text-primary transition-colors">← Website</Link>
+            <button onClick={() => setIsAuth(false)} className="rounded-lg border border-card-border px-4 py-2 text-sm font-medium text-muted hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-all">Logout</button>
           </div>
         </div>
       </div>
@@ -456,14 +487,22 @@ export default function AdminPage() {
 
         {/* Products List */}
         <div className="mt-12">
-          <h2 className="text-xl font-bold text-foreground mb-4">All Products ({products.length})</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-foreground">
+              All Products ({products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()) || p.companies?.name.toLowerCase().includes(searchQuery.toLowerCase())).length}{searchQuery && ` / ${products.length}`})
+            </h2>
+          </div>
+
           {prodLoad ? (
             <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-xl animate-shimmer" />)}</div>
           ) : products.length === 0 ? (
-            <p className="text-sm text-muted py-8 text-center">No products yet.</p>
+            <p className="text-sm text-muted py-8 text-center bg-surface rounded-xl border border-dashed border-card-border">No products yet. Add one above!</p>
           ) : (
             <div className="space-y-3">
-              {products.map(p => (
+              {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()) || p.companies?.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+                <p className="text-sm text-muted py-8 text-center bg-surface rounded-xl border border-dashed border-card-border">No products matching your search.</p>
+              ) : (
+                products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()) || p.companies?.name.toLowerCase().includes(searchQuery.toLowerCase())).map(p => (
                 <div key={p.id} className="flex items-center gap-4 rounded-xl border border-card-border bg-card-bg p-4">
                   {p.image_url ? (
                     <img src={p.image_url} alt={p.name} className="h-14 w-14 rounded-lg object-cover shrink-0" />
@@ -497,7 +536,8 @@ export default function AdminPage() {
                     )}
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           )}
         </div>
