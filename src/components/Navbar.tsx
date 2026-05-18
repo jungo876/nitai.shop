@@ -4,11 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t, toggleLanguage } = useLanguage();
+  const { user, isLoggedIn, requireAuth, logout } = useAuth();
+  const { count: cartCount } = useCart();
 
   // Admin page is hidden from public navigation
   const navLinks = [
@@ -51,7 +55,7 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Links + Language Toggle */}
+        {/* Desktop Links + Language Toggle + Auth */}
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => {
             const isActive =
@@ -84,10 +88,100 @@ export default function Navbar() {
             </svg>
             {t("lang_toggle")}
           </button>
+
+          {/* Cart Icon (Desktop) */}
+          {isLoggedIn && (
+            <Link
+              href="/cart"
+              className="ml-1 relative flex items-center justify-center h-9 w-9 rounded-lg text-muted hover:text-foreground hover:bg-surface transition-colors"
+              aria-label="Cart"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+              </svg>
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {/* Auth Button (Desktop) */}
+          {isLoggedIn ? (
+            <div className="ml-2 flex items-center gap-2">
+              <Link
+                href="/account"
+                className="flex items-center gap-1.5 rounded-lg bg-primary-light px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+                {user?.name || user?.phone_number || "Account"}
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-lg border border-card-border px-3 py-2 text-xs font-medium text-muted hover:text-red-500 hover:border-red-200 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => requireAuth({ type: "cart" })}
+              className="ml-2 flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-gradient-start to-gradient-end px-4 py-2 text-sm font-semibold text-white shadow-sm hover:shadow-md active:scale-[0.98] transition-all"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+              </svg>
+              Login
+            </button>
+          )}
         </div>
 
-        {/* Mobile: Language Toggle + Menu Button */}
+        {/* Mobile: Auth + Language + Menu */}
         <div className="md:hidden flex items-center gap-2">
+          {/* Mobile Auth Icon */}
+          {isLoggedIn ? (
+            <Link
+              href="/account"
+              className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary-light text-primary transition-colors"
+              aria-label="Account"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+              </svg>
+            </Link>
+          ) : (
+            <button
+              onClick={() => requireAuth({ type: "cart" })}
+              className="flex items-center justify-center h-10 w-10 rounded-lg bg-gradient-to-br from-gradient-start to-gradient-end text-white shadow-sm transition-transform active:scale-95"
+              aria-label="Login"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Cart Icon (Mobile) */}
+          {isLoggedIn && (
+            <Link
+              href="/cart"
+              className="relative flex items-center justify-center h-10 w-10 rounded-lg text-muted hover:text-foreground hover:bg-surface transition-colors"
+              aria-label="Cart"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+              </svg>
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              )}
+            </Link>
+          )}
+
           <button
             onClick={toggleLanguage}
             className="flex items-center gap-1 rounded-lg border border-card-border px-2.5 py-2 text-xs font-medium text-muted hover:text-foreground hover:bg-surface transition-colors"
@@ -140,6 +234,30 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* Mobile Auth Section in Dropdown */}
+            <div className="border-t border-card-border mt-2 pt-2">
+              {isLoggedIn ? (
+                <>
+                  <div className="px-4 py-2 text-xs font-medium text-muted">
+                    Logged in as <span className="text-foreground font-semibold">{user?.name || user?.phone_number}</span>
+                  </div>
+                  <button
+                    onClick={() => { logout(); setMobileOpen(false); }}
+                    className="block w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => { requireAuth({ type: "cart" }); setMobileOpen(false); }}
+                  className="block w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-primary hover:bg-primary-light transition-colors"
+                >
+                  Login / Sign Up
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

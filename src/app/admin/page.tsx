@@ -235,6 +235,7 @@ export default function AdminPage() {
             </div>
             {/* Mobile Actions */}
             <div className="flex items-center gap-3 sm:hidden">
+              <Link href="/admin/orders" className="text-sm text-primary font-medium">Orders</Link>
               <Link href="/" className="text-sm text-muted hover:text-primary transition-colors">Website</Link>
               <button onClick={() => setIsAuth(false)} className="rounded-lg border border-card-border px-3 py-1.5 text-sm text-muted hover:text-danger hover:border-danger/30 transition-colors">Logout</button>
             </div>
@@ -263,6 +264,7 @@ export default function AdminPage() {
 
           {/* Desktop Actions */}
           <div className="items-center gap-4 hidden sm:flex shrink-0">
+            <Link href="/admin/orders" className="text-sm font-medium text-primary hover:text-primary-hover transition-colors">📦 Orders</Link>
             <Link href="/" className="text-sm font-medium text-muted hover:text-primary transition-colors">← Website</Link>
             <button onClick={() => setIsAuth(false)} className="rounded-lg border border-card-border px-4 py-2 text-sm font-medium text-muted hover:text-danger hover:border-danger/30 hover:bg-danger/5 transition-all">Logout</button>
           </div>

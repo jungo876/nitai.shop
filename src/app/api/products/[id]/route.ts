@@ -3,6 +3,44 @@ import { getSupabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("*, companies(*), product_variants(*, bulk_prices(*))")
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // Sort variants and bulk_prices
+    const product = {
+      ...data,
+      product_variants: Array.isArray(data.product_variants)
+        ? data.product_variants.map((v: Record<string, unknown>) => ({
+            ...v,
+            bulk_prices: Array.isArray(v.bulk_prices)
+              ? [...(v.bulk_prices as { box_count: number }[])].sort((a, b) => a.box_count - b.box_count)
+              : [],
+          }))
+        : [],
+    };
+
+    return NextResponse.json(product);
+  } catch (err) {
+    console.error("Unexpected error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,14 +56,19 @@ export async function PUT(
     }
 
     // Update product
-    const { error: updateError } = await supabase
+    const { data: updatedRows, error: updateError } = await supabase
       .from("products")
       .update({ name, category, description, image_url: image_url || "", company_id: company_id || null, is_top_selling: is_top_selling || false })
-      .eq("id", id);
+      .eq("id", id)
+      .select();
 
     if (updateError) {
       console.error("Product update error:", updateError);
       return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json({ error: "Product update failed. This is usually caused by missing UPDATE policies in Supabase RLS for the products table." }, { status: 403 });
     }
 
     // Delete old variants (cascade deletes bulk_prices)

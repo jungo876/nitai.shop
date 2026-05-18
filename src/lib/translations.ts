@@ -30,6 +30,7 @@ export const translations = {
     products_error_title: "Failed to load products",
     products_no_category: "No products in this category.",
     products_order_whatsapp: "Order on WhatsApp",
+    products_view_details: "View Details",
 
     // Categories
     cat_insecticide: "Insecticide",
@@ -88,6 +89,7 @@ export const translations = {
     products_error_title: "পণ্য লোড করতে ব্যর্থ",
     products_no_category: "এই বিভাগে কোনো পণ্য নেই।",
     products_order_whatsapp: "WhatsApp-এ অর্ডার করুন",
+    products_view_details: "বিস্তারিত দেখুন",
 
     // Categories
     cat_insecticide: "কীটনাশক",

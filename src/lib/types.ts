@@ -56,3 +56,110 @@ export const CATEGORIES = [
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
+
+/* ─── Auth / User Types ─── */
+
+export interface AppUser {
+  id: string;
+  phone_number: string;
+  whatsapp_number: string | null;
+  name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  is_profile_complete: boolean;
+  created_at?: string;
+}
+
+export interface BusinessProfile {
+  id: string;
+  user_id: string;
+  shop_name: string | null;
+  gst_number: string | null;
+  pan_number: string | null;
+  is_gst_verified: boolean;
+  is_pan_verified: boolean;
+  business_type: string | null;
+  license_number: string | null;
+  created_at?: string;
+}
+
+export interface UserAddress {
+  id: string;
+  user_id: string;
+  address_line: string | null;
+  landmark: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  phone_number: string | null;
+  is_default: boolean;
+  created_at?: string;
+}
+
+/* ─── Order Types ─── */
+
+export type PaymentStatus = "pending" | "advance_paid" | "partially_paid" | "fully_paid" | "failed";
+export type OrderStatus = "placed" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+
+export interface Order {
+  id: string;
+  user_id: string;
+  
+  total_amount: number;
+  advance_amount: number;
+  remaining_amount: number;
+  
+  payment_status: PaymentStatus;
+  order_status: OrderStatus;
+  
+  payment_method: string | null;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
+  
+  created_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  
+  product_id: string;
+  variant_id: string;
+  bulk_price_id: string | null;
+  
+  product_name: string;
+  variant_label: string;
+  
+  box_count: number;
+  units_per_box: number;
+  
+  price_per_unit: number;
+  total_units: number;
+  total_price: number;
+  
+  created_at: string;
+}
+
+/* ─── Cart Types ─── */
+
+export interface CartItem {
+  id: string;
+  user_id: string;
+  product_id: string;
+  variant_id: string;
+  bulk_price_id: string | null;
+  box_count: number;
+  quantity: number;
+  created_at: string;
+}
+
+/** CartItem enriched with product data for display */
+export interface CartItemWithProduct extends CartItem {
+  product_name: string;
+  product_image: string;
+  variant_label: string;
+  units_per_box: number;
+  price_per_unit: number;
+  total_units: number;
+  total_price: number;
+}
