@@ -110,48 +110,41 @@ export interface UserAddress {
 
 /* ─── Order Types ─── */
 
-export type PaymentStatus = "pending" | "advance_paid" | "partially_paid" | "fully_paid" | "failed";
-export type OrderStatus = "placed" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
-export type RemainingPaymentMethod = "cash_on_delivery" | "upi" | "bank_transfer" | "cash";
+export type { OrderStatus, PaymentStatus, PaymentMethod, RemainingPaymentMethod } from "@/lib/order-status";
+import type { OrderStatus, PaymentStatus, PaymentMethod } from "@/lib/order-status";
 
 export interface Order {
   id: string;
+  order_number: number;
   user_id: string;
-  
   total_amount: number;
   advance_amount: number;
   remaining_amount: number;
-  
   payment_status: PaymentStatus;
   order_status: OrderStatus;
-  
-  payment_method: string | null;
+  payment_method: PaymentMethod;
   remaining_payment_method: string | null;
-  razorpay_order_id: string | null;
-  razorpay_payment_id: string | null;
-  
+  razorpay_payment_id?: string | null;
+  shipping_address?: Record<string, string | null> | null;
+  customer_snapshot?: Record<string, string | null> | null;
   created_at: string;
+  paid_at?: string | null;
 }
 
 export interface OrderItem {
   id: string;
-  order_id: string;
-  
-  product_id: string;
-  variant_id: string;
-  bulk_price_id: string | null;
-  
+  product_id: string | null;
+  variant_id: string | null;
   product_name: string;
   variant_label: string;
-  
   box_count: number;
   units_per_box: number;
-  
   price_per_unit: number;
   total_units: number;
   total_price: number;
-  
-  created_at: string;
+  product_status?: string;
+  available?: boolean;
+  unavailable_reason?: string | null;
 }
 
 /* ─── Cart Types ─── */
@@ -176,4 +169,7 @@ export interface CartItemWithProduct extends CartItem {
   price_per_unit: number;
   total_units: number;
   total_price: number;
+  product_status?: string;
+  available?: boolean;
+  unavailable_reason?: string | null;
 }

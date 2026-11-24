@@ -4,6 +4,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
+import { SettingsProvider } from "@/context/SettingsContext";
 import Navbar from "@/components/Navbar";
 import MobileHeader from "@/components/MobileHeader";
 import BottomNav from "@/components/BottomNav";
@@ -20,6 +21,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <LanguageProvider>
+     <SettingsProvider>
       <AuthProvider>
         <CartProvider>
           <WishlistProvider>
@@ -48,6 +50,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </WishlistProvider>
         </CartProvider>
       </AuthProvider>
+     </SettingsProvider>
     </LanguageProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -9,12 +9,8 @@ import { usePathname } from "next/navigation";
 export default function AdminSidebarDrawer() {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!user?.is_admin) return null;
 
@@ -25,7 +21,6 @@ export default function AdminSidebarDrawer() {
     { label: "Categories", href: "/admin/categories" },
     { label: "Customers", href: "/admin/customers" },
     { label: "Promotions / Content", href: "/admin/banners" },
-    { label: "Reviews", href: "/admin/reviews" },
     { label: "Analytics", href: "/admin/analytics" },
     { label: "Settings", href: "/admin/settings" },
   ];
@@ -46,7 +41,7 @@ export default function AdminSidebarDrawer() {
         </svg>
       </button>
 
-      {isOpen && mounted && createPortal(
+      {isOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex justify-end">
           {/* Backdrop */}
           <div 

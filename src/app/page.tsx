@@ -5,7 +5,6 @@ import type { Company, ProductWithVariants } from "@/lib/types";
 import ProductCard from "@/components/ProductCard";
 import TopSellingCard from "@/components/TopSellingCard";
 import PromoBannerCarousel from "@/components/PromoBannerCarousel";
-import RecentPurchasesTicker from "@/components/RecentPurchasesTicker";
 import { useLanguage } from "@/context/LanguageContext";
 import HomeCategoryNav from "@/components/HomeCategoryNav";
 import Link from "next/link";
@@ -47,11 +46,8 @@ export default function HomePage() {
   }, [searchTerm]);
 
   useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
+    // Results are only shown while there is a search term, so nothing to reset here.
+    if (!debouncedSearch.trim()) return;
 
     async function doSearch() {
       setIsSearching(true);
@@ -226,7 +222,7 @@ export default function HomePage() {
       {debouncedSearch.trim() ? (
         <section className="bg-background pt-6 pb-20 min-h-[50vh]">
           <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-            <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl mb-6">Search Results for "{debouncedSearch}"</h2>
+            <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl mb-6">Search results for &ldquo;{debouncedSearch}&rdquo;</h2>
 
             {isSearching ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
@@ -258,8 +254,6 @@ export default function HomePage() {
         <>
           <HomeCategoryNav />
           <PromoBannerCarousel />
-
-          <RecentPurchasesTicker />
 
           {/* Top Selling Section */}
           <section className="pt-4 sm:pt-6">

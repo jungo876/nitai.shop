@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -8,35 +8,19 @@ import { useWishlist } from "@/context/WishlistContext";
 
 export default function AccountPage() {
   const router = useRouter();
-  const { isLoggedIn, isLoading: authLoading } = useAuth();
+  const { user, isLoggedIn, isLoading: authLoading, requireAuth, logout } = useAuth();
   const { count: wishlistCount } = useWishlist();
   
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
+  // The logged-in user's full profile (business + address) comes from the auth context.
+  const profile = user;
+  const profileLoading = false;
 
   useEffect(() => {
     if (!authLoading && !isLoggedIn) {
+      requireAuth({ type: "account", returnUrl: "/account" });
       router.replace("/");
     }
-  }, [authLoading, isLoggedIn, router]);
-
-  useEffect(() => {
-    async function fetchProfile() {
-      if (!isLoggedIn) return;
-      try {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
-          const data = await res.json();
-          setProfile(data.user);
-        }
-      } catch (err) {
-        console.error("Failed to load profile", err);
-      } finally {
-        setProfileLoading(false);
-      }
-    }
-    fetchProfile();
-  }, [isLoggedIn]);
+  }, [authLoading, isLoggedIn, router, requireAuth]);
 
   if (authLoading || (isLoggedIn && profileLoading)) {
     return (
@@ -265,6 +249,16 @@ export default function AccountPage() {
               <p className="text-sm text-muted">No address provided.</p>
             )}
           </section>
+
+          <button
+            onClick={async () => {
+              await logout();
+              router.push("/");
+            }}
+            className="w-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-400"
+          >
+            Log out
+          </button>
         </div>
       </div>
     </div>

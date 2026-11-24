@@ -54,7 +54,9 @@ export default function AdminBannersPage() {
   }
 
   useEffect(() => {
-    if (isAuth) fetchBanners();
+    if (!isAuth) return;
+    const t = setTimeout(fetchBanners, 0); // load after first paint
+    return () => clearTimeout(t);
   }, [isAuth]);
 
   function handleImage(e: ChangeEvent<HTMLInputElement>) {
@@ -123,8 +125,9 @@ export default function AdminBannersPage() {
       if (imageFile) {
         const formData = new FormData();
         formData.append("file", imageFile);
+        formData.append("folder", "banners");
         const upRes = await fetch("/api/upload", { method: "POST", body: formData });
-        if (!upRes.ok) throw new Error("Image upload failed");
+        if (!upRes.ok) throw new Error((await upRes.json().catch(() => ({}))).error || "Image upload failed");
         const upData = await upRes.json();
         imageUrl = upData.url;
       }
@@ -187,11 +190,12 @@ export default function AdminBannersPage() {
 
   async function toggleActive(b: Banner) {
     try {
-      await fetch(`/api/banners/${b.id}`, {
+      const res = await fetch(`/api/banners/${b.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_active: !b.is_active }),
       });
+      if (!res.ok) throw new Error();
       setBanners((prev) =>
         prev.map((x) => (x.id === b.id ? { ...x, is_active: !x.is_active } : x))
       );

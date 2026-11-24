@@ -23,8 +23,10 @@ tested, deployable website the business can take real orders on.
 
 - **Current phase:** Phase 1 — critical architecture & bugs.
 - **Done so far:** see checklist below (Phase 0 complete).
-- **Next step:** secure OTP login + sessions (server + UI), then rewrite the
-  cart/checkout/payment APIs on the new database layer.
+- **Next step:** frontend — OTP login modal, cart/checkout on the new payment
+  flow, admin pages on the new admin APIs, policy pages. (Backend complete:
+  commit af96eb8, 53 tests.) Until the frontend is updated, the local UI's
+  login/checkout do not work — expected mid-way state on this branch.
 - **2026-11-25:** live DB backed up (`backups/`, git-ignored) and migrations
   001–003 applied. Public-key access to private data is now blocked (verified).
   The old live site still lists products; its login/cart/old admin no longer work.
@@ -76,14 +78,15 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 - ✅ Reconstruct live DB schema → baseline migration (verified against live DB)
 - ✅ Migration runner (`npm run db:migrate`, `db:status`) + backup (`npm run db:backup`)
 - ✅ Security/integrity migration: sessions, OTP, constraints, FKs, status names, order snapshots, RLS lockdown — **applied to Supabase**
-- 🔄 Server foundation: ✅ env, ✅ db client, ✅ logger, ⬜ HTTP helpers (errors, origin check, body limits)
-- ⬜ Auth: OTP request/verify, sessions, logout, guards; remove phone-number cookie and old admin-password route
-- ⬜ Cart: validate variant/tier/box count/product status server-side; ownership checks
-- ⬜ Checkout & payments: pending orders, signature + amount verification, webhook, idempotency, paise math
-- ⬜ Profile setup bound to the logged-in user (fixes "edit anyone's profile")
-- ⬜ Product editing updates variants in place (fixes ₹0 cart items) inside a transaction
-- ⬜ Admin dashboard/analytics/customers via server APIs (no browser DB access)
-- ⬜ Fix admin "Paid" button, CSV export, dev-tools reset
+- ✅ Server foundation: env, db client, logger, HTTP helpers (errors, CSRF origin check, body limits), rate limits
+- ✅ Auth API: OTP request/verify, DB sessions, logout, guards; insecure login + admin-password routes removed
+- ✅ Cart API: tier/variant/box-count/status validation, ownership checks, paise pricing
+- ✅ Checkout & payments API: pending orders, signature + Razorpay fetch verification, webhook, idempotency, expiry cron
+- ✅ Profile setup bound to the logged-in user
+- ✅ Product editing updates variants/tiers in place, in a transaction
+- ✅ Admin APIs: orders, stats, analytics, customers, settings, activity, export, upload
+- ✅ Admin "Paid" bug, CSV export, dev-tools reset fixed (API side)
+- ⬜ Frontend wired to the new APIs (in progress)
 - ⬜ Remove fake data (purchase ticker, random "low stock", invented funnel)
 
 ### Phase 2 — Essential missing features
@@ -111,7 +114,7 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 - ⬜ Route-by-route authorization review
 
 ### Phase 5 — Testing & QA
-- ⬜ Unit tests · ⬜ Integration tests (PGlite) · ⬜ API route tests
+- ✅ Integration + API route tests (PGlite + mock Razorpay): 53 passing · ⬜ more unit tests
 - ⬜ End-to-end tests (Playwright): browse → login → cart → checkout → admin
 - ⬜ Lint clean · ✅ typecheck · ✅ production build
 

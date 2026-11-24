@@ -7,6 +7,8 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import { api } from "@/lib/api-client";
+import { formatINR } from "@/lib/money";
 
 type PaymentMethod = "prepaid" | "cod";
 
@@ -47,9 +49,29 @@ interface CheckoutData {
     pincode: string | null;
     phone_number: string | null;
   } | null;
-  items: CheckoutItem[];
+  items: (CheckoutItem & { id: string; available: boolean })[];
   subtotal: number;
   item_count: number;
+  has_unavailable: boolean;
+  settings: { store_status: "open" | "closed"; closed_message: string | null; cod_enabled: boolean; cod_advance_percent: number; min_order_amount: number };
+}
+
+interface CreatedPayment {
+  order_id: string;
+  order_number: string;
+  razorpay_order_id: string;
+  key_id: string;
+  amount_paise: number;
+  currency: string;
+  description: string;
+  prefill: { name: string; contact: string };
+}
+
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Razorpay?: any;
+  }
 }
 
 export default function CheckoutPage() {
@@ -66,8 +88,11 @@ export default function CheckoutPage() {
 
   // Derived amounts
   const subtotal = data?.subtotal || 0;
-  const payNow = paymentMethod === "prepaid" ? subtotal : Math.round(subtotal * 0.10);
-  const remaining = subtotal - payNow;
+  const codPercent = data?.settings.cod_advance_percent ?? 10;
+  const payNow = paymentMethod === "prepaid" ? subtotal : Math.round(subtotal * codPercent) / 100;
+  const remaining = Math.round((subtotal - payNow) * 100) / 100;
+  const [payError, setPayError] = useState("");
+  const [confirming, setConfirming] = useState<CreatedPayment | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -83,87 +108,87 @@ export default function CheckoutPage() {
     }
   }, [authLoading, user, router]);
 
-  // Fetch checkout summary from backend
+  // Fetch the server-calculated checkout summary
   useEffect(() => {
-    async function loadSummary() {
-      if (!isLoggedIn) return;
-      try {
-        const res = await fetch("/api/checkout/summary", { method: "POST" });
-        const json = await res.json();
-
-        if (!res.ok) {
-          if (json.redirect) {
-            router.replace(json.redirect);
-            return;
-          }
-          setError(json.error || "Failed to load checkout");
-          return;
-        }
-
-        setData(json);
-      } catch {
-        setError("Something went wrong. Please try again.");
-      } finally {
-        setLoading(false);
+    if (!isLoggedIn) return;
+    let active = true;
+    api<CheckoutData>("/api/checkout/summary").then((r) => {
+      if (!active) return;
+      if (r.ok && r.data) {
+        setData(r.data);
+        if (!r.data.settings.cod_enabled) setPaymentMethod("prepaid");
+        if (r.data.items.length === 0) router.replace("/cart");
+      } else {
+        setError(r.error ?? "Failed to load checkout");
       }
-    }
-    loadSummary();
+      setLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [isLoggedIn, router]);
 
-  // Create order after Razorpay payment
-  const createOrder = useCallback(async (rpOrderId: string, rpPaymentId: string) => {
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        razorpay_order_id: rpOrderId,
-        razorpay_payment_id: rpPaymentId,
-        payment_method: paymentMethod,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      console.error("[CHECKOUT] Order API error response:", json);
-      throw new Error(json.detail || json.error || "Failed to create order");
-    }
-    return json;
-  }, [paymentMethod]);
+  /** Step 2: ask the server to verify the payment with Razorpay and confirm the order. */
+  const confirmOrder = useCallback(
+    async (created: CreatedPayment, response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+      setConfirming(created);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const r = await api<{ order_id: string }>("/api/payment/verify", { body: response });
+        if (r.ok) {
+          await refreshCart();
+          router.push(`/orders/${created.order_id}?placed=1`);
+          return;
+        }
+        if (r.status > 0 && r.status < 500) {
+          setConfirming(null);
+          setPaying(false);
+          setPayError(`${r.error} If money was deducted, it will be refunded automatically or confirmed shortly — check My Orders or contact us with order ${created.order_number}.`);
+          return;
+        }
+        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+      }
+      // Network trouble: the Razorpay webhook will still confirm a real payment.
+      await refreshCart();
+      router.push(`/orders/${created.order_id}?placed=1`);
+    },
+    [refreshCart, router]
+  );
 
-  // Razorpay payment handler
+  /** Step 1: create a pending order on the server, then open Razorpay for exactly that amount. */
   const handlePlaceOrder = useCallback(async () => {
-    if (!data || !razorpayReady) return;
+    if (!data || !razorpayReady || !window.Razorpay) return;
     setPaying(true);
-    try {
-      const res = await fetch("/api/payment/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payment_method: paymentMethod }),
-      });
-      if (!res.ok) { const e = await res.json(); alert(e.error || "Failed"); setPaying(false); return; }
-      const od = await res.json();
-      const rzp = new (window as any).Razorpay({
-        key: od.key_id, amount: od.amount_paise, currency: od.currency,
-        name: "NCK Agro", description: od.description,
-        order_id: od.order_id,
-        prefill: { name: od.user.name || "", contact: od.user.phone || "" },
-        theme: { color: "#16a34a" },
-        handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string }) => {
-          try {
-            const order = await createOrder(response.razorpay_order_id, response.razorpay_payment_id);
-            refreshCart();
-            router.push(`/orders/${order.order_id}`);
-          } catch (err: any) {
-              console.error("[CHECKOUT] Order creation failed after payment:", err);
-              alert(`Payment received but order creation failed: ${err?.message || "Unknown error"}. Contact support.`);
-              setPaying(false);
-            }
-        },
-        modal: { ondismiss: () => setPaying(false) },
-      });
-      rzp.on("payment.failed", (r: any) => { alert(`Payment failed: ${r.error.description}`); setPaying(false); });
-      rzp.open();
-    } catch { alert("Something went wrong."); setPaying(false); }
-  }, [data, razorpayReady, paymentMethod, createOrder, refreshCart, router]);
+    setPayError("");
+    const r = await api<CreatedPayment>("/api/payment/create-order", { body: { payment_method: paymentMethod } });
+    if (!r.ok || !r.data) {
+      setPaying(false);
+      if (r.redirect) {
+        router.push(r.redirect);
+        return;
+      }
+      setPayError(r.error ?? "Could not start the payment.");
+      return;
+    }
+    const created = r.data;
+    const rzp = new window.Razorpay({
+      key: created.key_id,
+      amount: created.amount_paise,
+      currency: created.currency,
+      name: "NCK Agro",
+      description: created.description,
+      order_id: created.razorpay_order_id,
+      prefill: created.prefill,
+      notes: { order_number: created.order_number },
+      theme: { color: "#16a34a" },
+      handler: (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => confirmOrder(created, response),
+      modal: { ondismiss: () => setPaying(false), confirm_close: true },
+    });
+    rzp.on("payment.failed", (resp: { error?: { description?: string } }) => {
+      setPayError(`Payment failed: ${resp.error?.description ?? "please try again"}. No money was taken for this attempt.`);
+      setPaying(false);
+    });
+    rzp.open();
+  }, [data, razorpayReady, paymentMethod, router, confirmOrder]);
 
   // Loading skeleton
   if (authLoading || loading) {
@@ -211,10 +236,18 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-background pb-56">
+      {confirming && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-background/95 px-6 text-center" role="status" aria-live="polite">
+          <svg className="h-10 w-10 animate-spin text-primary mb-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+          <p className="text-lg font-bold text-foreground">Confirming your payment…</p>
+          <p className="text-sm text-muted mt-1">Order {confirming.order_number}. Please don&apos;t close this page.</p>
+        </div>
+      )}
       {/* Razorpay Script */}
       <Script
         src="https://checkout.razorpay.com/v1/checkout.js"
-        onLoad={() => setRazorpayReady(true)}
+        onReady={() => setRazorpayReady(true)}
+        onError={() => setPayError("Could not load the payment window. Check your internet connection and refresh.")}
       />
       {/* Header */}
       <div className="border-b border-card-border bg-card-bg/80 backdrop-blur-md sticky top-0 z-30">
@@ -340,7 +373,7 @@ export default function CheckoutPage() {
 
           <div className="space-y-4">
             {data.items.map((item) => (
-              <div key={item.cart_item_id} className="flex gap-3">
+              <div key={item.id} className="flex gap-3">
                 <div className="relative h-16 w-16 rounded-lg overflow-hidden bg-surface shrink-0">
                   {item.product_image ? (
                     <Image src={item.product_image} alt={item.product_name} fill className="object-cover" sizes="64px" />
@@ -363,7 +396,7 @@ export default function CheckoutPage() {
                       {item.total_units} units @ ₹{item.price_per_unit}/unit
                     </span>
                     <span className="text-sm font-bold text-primary">
-                      ₹{item.total_price.toLocaleString("en-IN")}
+                      {formatINR(item.total_price)}
                     </span>
                   </div>
                 </div>
@@ -423,6 +456,7 @@ export default function CheckoutPage() {
             </button>
 
             {/* COD OPTION */}
+            {data.settings.cod_enabled && (
             <button
               type="button"
               onClick={() => setPaymentMethod("cod")}
@@ -443,7 +477,7 @@ export default function CheckoutPage() {
                     </svg>
                     <span className="text-sm font-bold text-foreground">Cash on Delivery</span>
                   </div>
-                  <p className="text-xs text-muted mt-1.5 ml-7">Pay only 10% now to confirm your order. Pay the remaining 90% during delivery.</p>
+                  <p className="text-xs text-muted mt-1.5 ml-7">Pay only {codPercent}% now to confirm your order. Pay the remaining {100 - codPercent}% on delivery.</p>
                   <div className="mt-2.5 ml-7 space-y-1">
                     <p className="text-[11px] text-primary font-medium flex items-center gap-1.5">
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
@@ -457,13 +491,14 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </button>
+            )}
           </div>
 
           {/* Info box */}
           <div className={`mt-4 rounded-lg p-3 text-xs font-medium ${paymentMethod === "prepaid" ? "bg-primary/5 text-primary border border-primary/20" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
             {paymentMethod === "prepaid"
               ? "Your order will be processed immediately after successful payment."
-              : "To confirm your order, a 10% advance payment is required. The remaining balance can be paid during delivery."
+              : `To confirm your order, a ${codPercent}% advance payment is required. The remaining balance is paid on delivery.`
             }
           </div>
         </section>
@@ -474,27 +509,27 @@ export default function CheckoutPage() {
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted font-medium">Order Total</span>
-              <span className="font-bold text-foreground">₹{subtotal.toLocaleString("en-IN")}</span>
+              <span className="font-bold text-foreground">{formatINR(subtotal)}</span>
             </div>
             <div className="border-t border-card-border my-1" />
             <div className="flex justify-between text-sm">
               <span className="text-foreground font-semibold">
-                Pay Now {paymentMethod === "cod" && <span className="text-xs text-muted font-normal">(10% Advance)</span>}
+                Pay Now {paymentMethod === "cod" && <span className="text-xs text-muted font-normal">({codPercent}% advance)</span>}
               </span>
-              <span className="text-lg font-extrabold text-primary">₹{payNow.toLocaleString("en-IN")}</span>
+              <span className="text-lg font-extrabold text-primary">{formatINR(payNow)}</span>
             </div>
             {remaining > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted font-medium">
-                  Remaining on Delivery <span className="text-xs">(90%)</span>
+                  Remaining on Delivery <span className="text-xs">({100 - codPercent}%)</span>
                 </span>
-                <span className="font-semibold text-foreground">₹{remaining.toLocaleString("en-IN")}</span>
+                <span className="font-semibold text-foreground">{formatINR(remaining)}</span>
               </div>
             )}
             <div className="border-t border-card-border my-1" />
             <div className="flex justify-between text-xs">
               <span className="text-muted">Payment Method</span>
-              <span className="font-semibold text-foreground capitalize">{paymentMethod === "prepaid" ? "Prepaid (Full)" : "COD (10% Advance)"}</span>
+              <span className="font-semibold text-foreground capitalize">{paymentMethod === "prepaid" ? "Prepaid (Full)" : `COD (${codPercent}% advance)`}</span>
             </div>
           </div>
         </section>
@@ -515,21 +550,34 @@ export default function CheckoutPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-xs text-muted font-medium">
-                {paymentMethod === "prepaid" ? "Full Payment" : "Advance (10%)"}
+                {paymentMethod === "prepaid" ? "Full Payment" : `Advance (${codPercent}%)`}
               </p>
-              <p className="text-xl font-extrabold text-primary">₹{payNow.toLocaleString("en-IN")}</p>
+              <p className="text-xl font-extrabold text-primary">{formatINR(payNow)}</p>
             </div>
             {remaining > 0 && (
               <p className="text-xs text-muted text-right">
-                Remaining: ₹{remaining.toLocaleString("en-IN")}<br />
+                Remaining: {formatINR(remaining)}<br />
                 <span className="text-[10px]">payable on delivery</span>
               </p>
             )}
           </div>
-          <button onClick={handlePlaceOrder} disabled={paying || !razorpayReady} className="w-full rounded-2xl bg-primary px-6 py-4 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-            {paying ? (<><svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Processing...</>) : (<><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>Pay ₹{payNow.toLocaleString("en-IN")} Securely</>)}
+          {data.settings.store_status === "closed" && (
+            <p role="alert" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+              {data.settings.closed_message || "We are not taking orders right now. Please try again later."}
+            </p>
+          )}
+          {data.has_unavailable && (
+            <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:bg-red-900/20 dark:text-red-400">
+              Some items are no longer available. <Link href="/cart" className="underline font-semibold">Review your cart</Link>.
+            </p>
+          )}
+          {payError && (
+            <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:bg-red-900/20 dark:text-red-400">{payError}</p>
+          )}
+          <button onClick={handlePlaceOrder} disabled={paying || !razorpayReady || data.settings.store_status === "closed" || data.has_unavailable || !data.address} className="w-full rounded-2xl bg-primary px-6 py-4 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {paying ? (<><svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Processing...</>) : (<><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>Pay {formatINR(payNow)} Securely</>)}
           </button>
-          <p className="text-center text-[11px] text-muted mt-2">Powered by Razorpay • Secure Payment</p>
+          <p className="text-center text-[11px] text-muted mt-2">{razorpayReady ? "Powered by Razorpay • Secure Payment" : "Loading secure payment…"}</p>
         </div>
       </div>
     </div>

@@ -11,12 +11,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // The mobile sidebar remembers which page it was opened on, so it closes
+  // automatically when you navigate.
+  const [openedOn, setOpenedOn] = useState<string | null>(null);
+  const sidebarOpen = openedOn === pathname;
+  const setSidebarOpen = (open: boolean) => setOpenedOn(open ? pathname : null);
 
-  // Close sidebar on route change on mobile
+  // Count of new (unseen) orders for the menu badge; refreshed every minute.
+  const [newOrders, setNewOrders] = useState(0);
   useEffect(() => {
-    setSidebarOpen(false);
-  }, [pathname]);
+    if (!isAuth) return;
+    let active = true;
+    const load = () =>
+      fetch("/api/admin/orders?limit=1")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => active && d && setNewOrders(d.counts?.unseen ?? 0))
+        .catch(() => {});
+    const first = setTimeout(load, 0);
+    const timer = setInterval(load, 60_000);
+    return () => {
+      active = false;
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [isAuth, pathname]);
 
   const navItems = [
     { label: "Dashboard", href: "/admin", icon: <DashboardIcon /> },
@@ -25,7 +43,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: "Categories", href: "/admin/categories", icon: <CategoriesIcon /> },
     { label: "Customers", href: "/admin/customers", icon: <CustomersIcon /> },
     { label: "Promotions / Content", href: "/admin/banners", icon: <PromotionsIcon /> },
-    { label: "Reviews", href: "/admin/reviews", icon: <ReviewsIcon /> },
     { label: "Analytics", href: "/admin/analytics", icon: <AnalyticsIcon /> },
     { label: "Settings", href: "/admin/settings", icon: <SettingsIcon /> },
   ];
@@ -99,6 +116,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 {item.icon}
                 {item.label}
+                {item.href === "/admin/orders" && newOrders > 0 && (
+                  <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white" aria-label={`${newOrders} new orders`}>{newOrders}</span>
+                )}
               </Link>
             );
           })}

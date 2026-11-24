@@ -6,8 +6,10 @@ import type { ProductWithVariants, Company, Product } from "@/lib/types";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
-interface BulkRow { box_count: string; price_per_unit: string; tag: string; }
-interface VariantRow { label: string; unit_price: string; units_per_box: string; bulk_prices: BulkRow[]; }
+// `id` is kept for rows that already exist so edits update them in place
+// (customers' cart items stay valid); new rows have no id.
+interface BulkRow { id?: string; box_count: string; price_per_unit: string; tag: string; }
+interface VariantRow { id?: string; label: string; unit_price: string; units_per_box: string; bulk_prices: BulkRow[]; }
 
 const emptyBulk = (): BulkRow => ({ box_count: "", price_per_unit: "", tag: "" });
 const emptyVariant = (): VariantRow => ({ label: "", unit_price: "", units_per_box: "1", bulk_prices: [emptyBulk()] });
@@ -50,7 +52,7 @@ export default function AdminPage() {
   async function fetchProducts() {
     setProdLoad(true);
     try {
-      const res = await fetch("/api/products?include_hidden=true");
+      const res = await fetch("/api/products?include_hidden=true&limit=200");
       if (res.ok) setProducts(await res.json());
     } catch { /* ignore */ } finally { setProdLoad(false); }
   }
@@ -59,7 +61,12 @@ export default function AdminPage() {
     try { const r = await fetch("/api/companies"); if (r.ok) setCompanies(await r.json()); } catch {}
   }
 
-  useEffect(() => { if (isAuth) { fetchProducts(); fetchCompanies(); } }, [isAuth]);
+  useEffect(() => {
+    if (!isAuth) return;
+    // Load after the first paint (avoids synchronous state updates inside the effect).
+    const t = setTimeout(() => { fetchProducts(); fetchCompanies(); }, 0);
+    return () => clearTimeout(t);
+  }, [isAuth]);
 
   function handleCompImg(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -71,9 +78,9 @@ export default function AdminPage() {
     try {
       let logoUrl = "";
       if (newCompLogoFile) {
-        const fd = new FormData(); fd.append("file", newCompLogoFile);
+        const fd = new FormData(); fd.append("file", newCompLogoFile); fd.append("folder", "brands");
         const ur = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!ur.ok) throw new Error("Logo upload failed");
+        if (!ur.ok) throw new Error((await ur.json().catch(() => ({}))).error || "Logo upload failed");
         logoUrl = (await ur.json()).url;
       }
       
@@ -92,12 +99,12 @@ export default function AdminPage() {
   async function handleDeleteCompany(id: string) {
     try {
       const r = await fetch(`/api/companies/${id}`, { method: "DELETE" });
-      if (!r.ok) throw new Error();
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed to delete company");
       setCompanies(prev => prev.filter(c => c.id !== id)); setDelCompConfirm(null);
       if (companyId === id) setCompanyId("");
       if (selectedManageCompId === id) setSelectedManageCompId("");
-      setMsg({ type: "success", text: "Company deleted!" });
-    } catch { setMsg({ type: "error", text: "Failed to delete company" }); }
+      setMsg({ type: "success", text: "Brand deleted. Its products are kept without a brand." });
+    } catch (err) { setMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to delete company" }); }
   }
 
   function handleImg(e: ChangeEvent<HTMLInputElement>) {
@@ -125,9 +132,9 @@ export default function AdminPage() {
     if (fileRef.current) fileRef.current.value = "";
     if (p.product_variants?.length) {
       setVariants(p.product_variants.map(v => ({
-        label: v.label, unit_price: String(v.unit_price), units_per_box: String(v.units_per_box),
+        id: v.id, label: v.label, unit_price: String(v.unit_price), units_per_box: String(v.units_per_box),
         bulk_prices: v.bulk_prices?.length
-          ? v.bulk_prices.map(b => ({ box_count: String(b.box_count), price_per_unit: String(b.price_per_unit), tag: b.tag || "" }))
+          ? v.bulk_prices.map(b => ({ id: b.id, box_count: String(b.box_count), price_per_unit: String(b.price_per_unit), tag: b.tag || "" }))
           : [emptyBulk()],
       })));
     } else { setVariants([emptyVariant()]); }
@@ -145,7 +152,7 @@ export default function AdminPage() {
       setMsg({ type: "success", text: "Product deleted!" });
       if (editingId === id) resetForm();
       setDelConfirm(null);
-    } catch (err: any) { setMsg({ type: "error", text: err.message || "Failed to delete" }); }
+    } catch (err) { setMsg({ type: "error", text: err instanceof Error ? err.message : "Failed to delete" }); }
   }
 
   // Variant helpers
@@ -169,21 +176,25 @@ export default function AdminPage() {
     try {
       let imgUrl = existingImg;
       if (imageFile) {
-        const fd = new FormData(); fd.append("file", imageFile);
+        const fd = new FormData(); fd.append("file", imageFile); fd.append("folder", "products");
         const ur = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!ur.ok) throw new Error("Image upload failed");
+        if (!ur.ok) throw new Error((await ur.json().catch(() => ({}))).error || "Image upload failed");
         imgUrl = (await ur.json()).url;
       }
       const varData = variants.filter(v => v.label && v.unit_price).map(v => ({
-        label: v.label, unit_price: parseFloat(v.unit_price) || 0, units_per_box: parseInt(v.units_per_box) || 1,
+        id: v.id ?? null, label: v.label, unit_price: parseFloat(v.unit_price) || 0, units_per_box: parseInt(v.units_per_box) || 1,
         bulk_prices: v.bulk_prices.filter(b => b.box_count && b.price_per_unit).map(b => ({
-          box_count: parseInt(b.box_count), price_per_unit: parseFloat(b.price_per_unit), tag: b.tag || null,
+          id: b.id ?? null, box_count: parseInt(b.box_count), price_per_unit: parseFloat(b.price_per_unit), tag: b.tag || null,
         })),
       }));
+      if (varData.length === 0) throw new Error("Add at least one pack size with a price.");
       const payload = { name, category, description, image_url: imgUrl, company_id: companyId || null, is_top_selling: isTopSelling, status, home_category: homeCategory || null, variants: varData };
       const url = editingId ? `/api/products/${editingId}` : "/api/products";
       const res = await fetch(url, { method: editingId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error(editingId ? "Update failed" : "Create failed");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || (editingId ? "Update failed" : "Create failed"));
+      }
       setMsg({ type: "success", text: editingId ? `"${name}" updated!` : `"${name}" added!` });
       resetForm(); fetchProducts();
     } catch (err) { setMsg({ type: "error", text: err instanceof Error ? err.message : "Something went wrong" }); }

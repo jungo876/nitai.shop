@@ -40,8 +40,8 @@ export default function DevToolsPage() {
       if (!res.ok) throw new Error(data.error || "Failed to execute action");
 
       setMsg({ type: "success", text: data.message || "Action completed successfully." });
-    } catch (err: any) {
-      setMsg({ type: "error", text: err.message || "Something went wrong." });
+    } catch (err) {
+      setMsg({ type: "error", text: err instanceof Error ? err.message : "Something went wrong." });
     } finally {
       setLoading(false);
       setConfirmAction(null);
@@ -49,44 +49,8 @@ export default function DevToolsPage() {
     }
   }
 
-  function ActionCard({ title, desc, actionKey, btnText, confirmText }: { title: string, desc: string, actionKey: ActionType, btnText: string, confirmText: string }) {
-    return (
-      <div className="rounded-2xl border border-card-border bg-card-bg p-5 sm:p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-foreground mb-1">{title}</h2>
-        <p className="text-sm text-muted mb-5">{desc}</p>
-        
-        {confirmAction === actionKey ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-900/10">
-            <h4 className="text-sm font-bold text-red-800 dark:text-red-400 mb-1">Confirm Action</h4>
-            <p className="text-xs text-red-600 dark:text-red-400/80 mb-3">{confirmText}</p>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setConfirmAction(null)} 
-                disabled={loading}
-                className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => executeAction(actionKey)} 
-                disabled={loading}
-                className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                {loading ? "Working..." : btnText}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button 
-            onClick={() => setConfirmAction(actionKey)}
-            className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/20"
-          >
-            {btnText}
-          </button>
-        )}
-      </div>
-    );
-  }
+  const cardState = { confirmAction, setConfirmAction, loading, executeAction };
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
@@ -111,7 +75,7 @@ export default function DevToolsPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        <ActionCard 
+        <ActionCard state={cardState} 
           title="Clear All Orders" 
           desc="Permanently deletes all orders and their associated order items from the database." 
           actionKey="clear_orders" 
@@ -119,7 +83,7 @@ export default function DevToolsPage() {
           confirmText="Are you sure you want to delete ALL orders? This action cannot be undone." 
         />
         
-        <ActionCard 
+        <ActionCard state={cardState} 
           title="Clear Entire Cart" 
           desc="Removes all items from every user's shopping cart." 
           actionKey="clear_cart" 
@@ -127,7 +91,7 @@ export default function DevToolsPage() {
           confirmText="Are you sure you want to delete all cart items for all users?" 
         />
 
-        <ActionCard 
+        <ActionCard state={cardState} 
           title="Clear Wishlists" 
           desc="Removes all saved items from every user's wishlist." 
           actionKey="clear_wishlist" 
@@ -135,7 +99,7 @@ export default function DevToolsPage() {
           confirmText="Are you sure you want to clear all wishlists?" 
         />
 
-        <ActionCard 
+        <ActionCard state={cardState} 
           title="Clear Payments" 
           desc="Resets the payment status for all existing orders back to 'pending'. This does NOT delete the orders themselves." 
           actionKey="clear_payments" 
@@ -144,7 +108,7 @@ export default function DevToolsPage() {
         />
 
         <div className="md:col-span-2">
-          <ActionCard 
+          <ActionCard state={cardState} 
             title="Reset Demo Data (Full Reset)" 
             desc="The nuclear option. Permanently deletes all orders, all cart items, and all wishlists in one go. Does NOT delete your products." 
             actionKey="reset_demo_data" 
@@ -153,6 +117,53 @@ export default function DevToolsPage() {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+interface CardState {
+confirmAction: ActionType;
+setConfirmAction: (a: ActionType) => void;
+loading: boolean;
+executeAction: (a: ActionType) => void;
+}
+
+function ActionCard({ title, desc, actionKey, btnText, confirmText, state }: { title: string; desc: string; actionKey: ActionType; btnText: string; confirmText: string; state: CardState }) {
+const { confirmAction, setConfirmAction, loading, executeAction } = state;
+  return (
+    <div className="rounded-2xl border border-card-border bg-card-bg p-5 sm:p-6 shadow-sm">
+      <h2 className="text-lg font-bold text-foreground mb-1">{title}</h2>
+      <p className="text-sm text-muted mb-5">{desc}</p>
+      
+      {confirmAction === actionKey ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-900/10">
+          <h4 className="text-sm font-bold text-red-800 dark:text-red-400 mb-1">Confirm Action</h4>
+          <p className="text-xs text-red-600 dark:text-red-400/80 mb-3">{confirmText}</p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setConfirmAction(null)} 
+              disabled={loading}
+              className="flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={() => executeAction(actionKey)} 
+              disabled={loading}
+              className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Working..." : btnText}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button 
+          onClick={() => setConfirmAction(actionKey)}
+          className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/20"
+        >
+          {btnText}
+        </button>
+      )}
     </div>
   );
 }
