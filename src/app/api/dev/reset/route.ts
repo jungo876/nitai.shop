@@ -1,70 +1,34 @@
-import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
+import { z } from "zod";
+import { forbidden, json, readJson, route } from "@/server/http";
+import { requireAdmin } from "@/server/auth/session";
+import { db } from "@/server/db";
+import { env } from "@/server/env";
+import { logAdminAction } from "@/server/audit";
 
-export const dynamic = "force-dynamic";
+const schema = z.object({
+  action: z.enum(["clear_orders", "clear_cart", "clear_wishlist", "clear_payments", "reset_demo_data"]),
+});
 
-export async function POST(request: Request) {
-  // 1. Ensure user is admin
-  const { user: admin, error: authErr } = await requireAdmin();
-  if (authErr) return authErr;
-
-  // 2. Ensure environment is development (Safety check)
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { error: "Dev tools are strictly disabled in production" },
-      { status: 403 }
-    );
-  }
-
-  try {
-    const { action } = await request.json();
-    const supabase = getSupabase();
-
-    switch (action) {
-      case "clear_orders":
-        // Cascades to order_items
-        await supabase.from("orders").delete().neq("id", "");
-        await logAdminAction(admin.id, "Dev Tool", "Order", "ALL", { action: "clear_orders" });
-        break;
-
-      case "clear_cart":
-        await supabase.from("cart_items").delete().neq("id", "");
-        await logAdminAction(admin.id, "Dev Tool", "Cart", "ALL", { action: "clear_cart" });
-        break;
-
-      case "clear_wishlist":
-        // If wishlist exists, clear it
-        const { error } = await supabase.from("wishlists").delete().neq("id", "");
-        if (!error) {
-          await logAdminAction(admin.id, "Dev Tool", "Wishlist", "ALL", { action: "clear_wishlist" });
-        }
-        break;
-
-      case "clear_payments":
-        // We do not have a dedicated payments table, so we reset payment_status on orders
-        await supabase
-          .from("orders")
-          .update({ payment_status: "pending", razorpay_order_id: null, razorpay_payment_id: null, razorpay_signature: null })
-          .neq("id", "");
-        await logAdminAction(admin.id, "Dev Tool", "Payment", "ALL", { action: "clear_payments" });
-        break;
-
-      case "reset_demo_data":
-        // Wipe carts, wishlists, and orders
-        await supabase.from("cart_items").delete().neq("id", "");
-        await supabase.from("wishlists").delete().neq("id", "");
-        await supabase.from("orders").delete().neq("id", "");
-        await logAdminAction(admin.id, "Dev Tool", "System", "ALL", { action: "reset_demo_data" });
-        break;
-
-      default:
-        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+/**
+ * POST /api/dev/reset — wipes TEST data. Admin only, and refused entirely in
+ * production (APP_ENV=production) so real orders can never be deleted here.
+ */
+export const POST = route(async (req) => {
+  const admin = await requireAdmin(req);
+  if (env().isProduction) throw forbidden("Development tools are disabled in production.");
+  const { action } = await readJson(req, schema);
+  const sql = db();
+  const counts: Record<string, number> = {};
+  await sql.begin(async (tx) => {
+    if (action === "clear_orders" || action === "reset_demo_data") counts.orders = (await tx`delete from orders`).count;
+    if (action === "clear_cart" || action === "reset_demo_data") counts.cart_items = (await tx`delete from cart_items`).count;
+    if (action === "clear_wishlist" || action === "reset_demo_data") counts.wishlist_items = (await tx`delete from wishlist_items`).count;
+    if (action === "clear_payments") {
+      counts.orders = (await tx`
+        update orders set payment_status = 'pending', razorpay_payment_id = null, razorpay_signature = null, paid_at = null
+        where payment_status <> 'pending'`).count;
     }
-
-    return NextResponse.json({ success: true, message: `Action ${action} completed.` });
-  } catch (err) {
-    console.error("Dev Reset Error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
+  });
+  await logAdminAction(admin.id, "Dev Tool", "System", action, counts);
+  return json({ success: true, message: `Done: ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ") || "nothing to change"}.`, counts });
+});

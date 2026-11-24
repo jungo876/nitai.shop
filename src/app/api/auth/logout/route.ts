@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { json, route } from "@/server/http";
+import { destroySession } from "@/server/auth/session";
 
-export async function POST() {
-  const response = NextResponse.json({ success: true });
-  response.cookies.delete("nck_session");
-  return response;
-}
+/** POST /api/auth/logout */
+export const POST = route(async (req) => {
+  const res = json({ ok: true });
+  await destroySession(req, res);
+  return res;
+});

@@ -1,50 +1,82 @@
 import { z } from "zod";
+import { normalizeIndianMobile } from "@/lib/phone";
 
-/** Indian phone: 10 digits, optionally prefixed with +91 or 91 */
-const indianPhone = z
+/** Indian mobile number in any common format -> normalised 10 digits. */
+export const indianMobile = z
   .string()
   .trim()
-  .regex(/^(\+?91)?[6-9]\d{9}$/, "Must be a valid Indian mobile number");
+  .transform((v, ctx) => {
+    const n = normalizeIndianMobile(v);
+    if (!n) {
+      ctx.addIssue({ code: "custom", message: "Enter a valid 10-digit Indian mobile number." });
+      return z.NEVER;
+    }
+    return n;
+  });
 
-/** GST: 15 chars alphanumeric (standard GSTIN format) */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v ? v : null));
+
+/** GSTIN: 15 chars, e.g. 19ABCDE1234F1Z5 (empty allowed). */
 const gstNumber = z
   .string()
   .trim()
-  .regex(/^\d{2}[A-Z]{5}\d{4}[A-Z]{1}\d[Z]{1}[A-Z\d]{1}$/, "Invalid GST number format")
+  .toUpperCase()
+  .refine((v) => v === "" || /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v), "Invalid GST number (15 characters, e.g. 19ABCDE1234F1Z5).")
   .optional()
-  .or(z.literal(""));
+  .transform((v) => (v ? v : null));
 
-/** PAN: 10 chars AAAAA9999A */
+/** PAN: AAAAA9999A (empty allowed). */
 const panNumber = z
   .string()
   .trim()
-  .regex(/^[A-Z]{5}\d{4}[A-Z]{1}$/, "Invalid PAN number format")
+  .toUpperCase()
+  .refine((v) => v === "" || /^[A-Z]{5}\d{4}[A-Z]$/.test(v), "Invalid PAN (e.g. ABCDE1234F).")
   .optional()
-  .or(z.literal(""));
+  .transform((v) => (v ? v : null));
 
-/** Pincode: exactly 6 digits */
-const pincode = z
-  .string()
-  .trim()
-  .regex(/^\d{6}$/, "Pincode must be 6 digits");
+export const BUSINESS_TYPES = ["retailer", "distributor", "dealer", "farmer", "other"] as const;
 
-/* ─── Login ─── */
-export const loginSchema = z.object({
-  phone_number: z.string().min(10, "Phone number must be at least 10 digits"),
+export const otpRequestSchema = z.object({ phone_number: indianMobile });
+export const otpVerifySchema = z.object({
+  phone_number: indianMobile,
+  code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code."),
 });
 
-/* ─── Profile Setup ─── */
+/** Profile setup / edit. The user is always taken from the session, never from the body. */
 export const setupSchema = z.object({
-  user_id: z.string().uuid("Invalid user ID"),
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
-  whatsapp_number: indianPhone.optional().or(z.literal("")),
-  shop_name: z.string().trim().min(1, "Shop name is required").max(200),
+  name: z.string().trim().min(2, "Name must be at least 2 characters.").max(100),
+  whatsapp_number: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v, ctx) => {
+      if (!v) return null;
+      const n = normalizeIndianMobile(v);
+      if (!n) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid WhatsApp number." });
+        return z.NEVER;
+      }
+      return n;
+    }),
+  shop_name: z.string().trim().min(1, "Shop name is required.").max(200),
   gst_number: gstNumber,
   pan_number: panNumber,
-  business_type: z.string().max(50).optional().or(z.literal("")),
-  address_line: z.string().trim().min(1, "Address is required").max(500),
-  landmark: z.string().max(200).optional().or(z.literal("")),
-  city: z.string().trim().min(1, "City is required").max(100),
-  state: z.string().trim().min(1, "State is required").max(100),
-  pincode: pincode,
+  business_type: z
+    .enum(BUSINESS_TYPES)
+    .optional()
+    .or(z.literal("").transform(() => undefined))
+    .transform((v) => v ?? null),
+  address_line: z.string().trim().min(5, "Please enter the full address.").max(500),
+  landmark: optionalText(200),
+  city: z.string().trim().min(2, "City is required.").max(100),
+  state: z.string().trim().min(2, "State is required.").max(100),
+  pincode: z.string().trim().regex(/^[1-9]\d{5}$/, "Pincode must be 6 digits."),
 });
+
+export type SetupInput = z.infer<typeof setupSchema>;

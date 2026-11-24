@@ -1,22 +1,22 @@
 import { z } from "zod";
+import { ADMIN_ORDER_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, REMAINING_PAYMENT_METHODS } from "@/lib/order-status";
 
-const orderStatuses = ["placed", "confirmed", "processing", "shipped", "delivered", "cancelled"] as const;
-const paymentStatuses = ["pending", "advance_paid", "paid", "failed", "cancelled"] as const;
-const paymentMethods = ["prepaid", "cod"] as const;
-
-/* ─── Create Order (after Razorpay payment) ─── */
-export const createOrderSchema = z.object({
-  razorpay_order_id: z.string().min(1, "Razorpay order ID is required"),
-  razorpay_payment_id: z.string().min(1, "Razorpay payment ID is required"),
-  payment_method: z.enum(paymentMethods).default("prepaid"),
+export const createPaymentSchema = z.object({
+  payment_method: z.enum(PAYMENT_METHODS, { error: "Choose Prepaid or Cash on delivery." }),
 });
 
-/* ─── Admin: Update Order Status ─── */
-export const updateOrderStatusSchema = z.object({
-  order_id: z.string().uuid("Invalid order ID"),
-  order_status: z.enum(orderStatuses).optional(),
-  payment_status: z.enum(paymentStatuses).optional(),
-}).refine(
-  (data) => data.order_status || data.payment_status,
-  { message: "At least one status field must be provided" }
-);
+export const verifyPaymentSchema = z.object({
+  razorpay_order_id: z.string().trim().regex(/^order_[A-Za-z0-9]+$/, "Invalid payment reference."),
+  razorpay_payment_id: z.string().trim().regex(/^pay_[A-Za-z0-9]+$/, "Invalid payment reference."),
+  razorpay_signature: z.string().trim().regex(/^[0-9a-f]{64}$/i, "Invalid payment signature."),
+});
+
+export const adminUpdateOrderSchema = z
+  .object({
+    order_id: z.uuid("Invalid order."),
+    order_status: z.enum(ADMIN_ORDER_STATUSES).optional(),
+    payment_status: z.enum(PAYMENT_STATUSES).optional(),
+    remaining_payment_method: z.enum(REMAINING_PAYMENT_METHODS).nullable().optional(),
+    admin_notes: z.string().trim().max(2000).nullable().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 1, { message: "Nothing to update." });

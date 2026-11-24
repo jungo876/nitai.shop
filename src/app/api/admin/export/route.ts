@@ -1,31 +1,19 @@
-import { NextResponse } from "next/server";
-import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
-import { getSupabase } from "@/lib/supabase";
+import { route } from "@/server/http";
+import { requireAdmin } from "@/server/auth/session";
+import { ordersCsv } from "@/server/admin/orders";
+import { logAdminAction } from "@/server/audit";
 
-export const dynamic = "force-dynamic";
-
-export async function POST() {
-  try {
-    const { user: admin, error: authErr } = await requireAdmin();
-    if (authErr) return authErr;
-
-    const supabase = getSupabase();
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select("*, users(name, phone_number), business_profiles(shop_name)")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      return NextResponse.json({ error: "Failed to fetch orders for export" }, { status: 500 });
-    }
-
-    // Usually, you might return the CSV data directly, or a URL to a generated file.
-    // For now, we simply return the data so the frontend can convert it to CSV.
-    await logAdminAction(admin.id, "CSV Export Generated", "Orders");
-
-    return NextResponse.json({ success: true, orders });
-  } catch (err) {
-    console.error("Export error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
+/** GET /api/admin/export -> orders.csv (spreadsheet-safe) */
+export const GET = route(async (req) => {
+  const admin = await requireAdmin(req);
+  const csv = await ordersCsv();
+  await logAdminAction(admin.id, "CSV Export", "Orders");
+  const date = new Date().toISOString().slice(0, 10);
+  return new Response(csv, {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="NCK_Orders_${date}.csv"`,
+      "cache-control": "no-store",
+    },
+  });
+});

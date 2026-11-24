@@ -3,7 +3,7 @@
 > Living document. Updated at every milestone. **If work is interrupted, the
 > "Where we are / next step" section tells you exactly where to resume.**
 
-Last updated: 2026-11-25 · Branch: `production-readiness` (local, not pushed)
+Last updated: 2026-11-25 (evening) · Branch: `production-readiness` (local, not pushed)
 
 ---
 
@@ -23,8 +23,11 @@ tested, deployable website the business can take real orders on.
 
 - **Current phase:** Phase 1 — critical architecture & bugs.
 - **Done so far:** see checklist below (Phase 0 complete).
-- **Next step:** reconstruct the live database schema into a baseline migration,
-  then build the server foundation (env, db client, auth).
+- **Next step:** secure OTP login + sessions (server + UI), then rewrite the
+  cart/checkout/payment APIs on the new database layer.
+- **2026-11-25:** live DB backed up (`backups/`, git-ignored) and migrations
+  001–003 applied. Public-key access to private data is now blocked (verified).
+  The old live site still lists products; its login/cart/old admin no longer work.
 
 ## 3. Decisions
 
@@ -70,10 +73,10 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 - ✅ `npm run check-env` — reports configured variables without printing secrets
 
 ### Phase 1 — Critical architecture & bugs
-- ⬜ Reconstruct live DB schema → baseline migration (repo SQL did not match the live DB)
-- ⬜ Migration runner + database backup script
-- ⬜ Security/integrity migration: sessions, OTP, constraints, foreign keys, status names, order snapshots, RLS lockdown
-- ⬜ Server foundation: validated env, db client, logger, HTTP helpers (errors, origin check, body limits)
+- ✅ Reconstruct live DB schema → baseline migration (verified against live DB)
+- ✅ Migration runner (`npm run db:migrate`, `db:status`) + backup (`npm run db:backup`)
+- ✅ Security/integrity migration: sessions, OTP, constraints, FKs, status names, order snapshots, RLS lockdown — **applied to Supabase**
+- 🔄 Server foundation: ✅ env, ✅ db client, ✅ logger, ⬜ HTTP helpers (errors, origin check, body limits)
 - ⬜ Auth: OTP request/verify, sessions, logout, guards; remove phone-number cookie and old admin-password route
 - ⬜ Cart: validate variant/tier/box count/product status server-side; ownership checks
 - ⬜ Checkout & payments: pending orders, signature + amount verification, webhook, idempotency, paise math
@@ -94,9 +97,9 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 - ⬜ Expire unpaid pending orders (scheduled job)
 
 ### Phase 3 — Integration with the real database
-- ⏸ Back up live database (needs `DATABASE_URL`)
-- ⏸ Apply migrations to Supabase
-- ⏸ Lock down storage bucket policies; uploads via service key
+- ✅ Back up live database
+- ✅ Apply migrations to Supabase (001–003)
+- ✅ Lock down storage bucket policies (anonymous uploads denied — verified); ⬜ uploads via secret key in new code
 - ⏸ Smoke test against real DB + Razorpay test mode
 
 ### Phase 4 — Security hardening
@@ -123,7 +126,7 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 
 | # | Item | Needed for | Status |
 |---|---|---|---|
-| 1 | Add `DATABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` | Phase 3 | ⏸ waiting |
+| 1 | Add `DATABASE_URL` and `SUPABASE_SECRET_KEY` to `.env.local` | Phase 3 | ✅ done — but **reset the DB password** (it was pasted in chat) and switch to the Transaction pooler URL |
 | 2 | Choose SMS/WhatsApp OTP provider; start DLT registration if SMS | Launch | ⏸ waiting (lead time: days) |
 | 3 | Razorpay live-mode activation (KYC) | Launch | ⏸ waiting (lead time: days) |
 | 4 | Hosting budget: Supabase Pro (free tier pauses), Vercel Pro (Hobby is non-commercial) | Launch | ⏸ decision |

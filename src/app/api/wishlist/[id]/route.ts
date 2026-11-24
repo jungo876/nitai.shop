@@ -1,56 +1,11 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getSupabase } from "@/lib/supabase";
-import { z } from "zod";
+import { assertUuid, json, route } from "@/server/http";
+import { requireUser } from "@/server/auth/session";
+import { db } from "@/server/db";
 
-export const dynamic = "force-dynamic";
-
-/**
- * DELETE /api/wishlist/[id]
- * Removes a product from wishlist by product_id.
- */
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: productId } = await params;
-
-    // Validate param
-    if (!z.string().uuid().safeParse(productId).success) {
-      return NextResponse.json({ success: false, error: "Invalid product ID" }, { status: 400 });
-    }
-    const cookieStore = await cookies();
-    const phone = cookieStore.get("nck_session")?.value;
-    if (!phone) {
-      return NextResponse.json({ error: "Not logged in" }, { status: 401 });
-    }
-
-    const supabase = getSupabase();
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("phone_number", phone)
-      .single();
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const { error } = await supabase
-      .from("wishlist_items")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("product_id", productId);
-
-    if (error) {
-      console.error("Wishlist DELETE error:", error);
-      return NextResponse.json({ error: "Failed to remove" }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("Wishlist DELETE error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
+/** DELETE /api/wishlist/:productId */
+export const DELETE = route<{ params: Promise<{ id: string }> }>(async (req, { params }) => {
+  const user = await requireUser(req);
+  const productId = assertUuid((await params).id, "product id");
+  await db()`delete from wishlist_items where user_id = ${user.id} and product_id = ${productId}`;
+  return json({ success: true });
+});

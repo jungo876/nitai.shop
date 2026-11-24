@@ -1,83 +1,33 @@
-import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
-import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
+import { assertUuid, badRequest, json, notFound, readJson, route } from "@/server/http";
+import { requireAdmin } from "@/server/auth/session";
+import { db } from "@/server/db";
+import { logAdminAction } from "@/server/audit";
+import { bannerUpdateSchema } from "@/lib/validations/product";
 
-export const dynamic = "force-dynamic";
+type Ctx = { params: Promise<{ id: string }> };
 
-/**
- * PUT /api/banners/[id]
- * Admin only: Update a banner.
- */
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { error: authErr, user: adminUser } = await requireAdmin();
-    if (authErr) return authErr;
+/** PUT /api/banners/:id (admin) — partial update */
+export const PUT = route<Ctx>(async (req, { params }) => {
+  const admin = await requireAdmin(req);
+  const id = assertUuid((await params).id, "banner id");
+  const u = await readJson(req, bannerUpdateSchema);
+  const fields = Object.fromEntries(Object.entries(u).filter(([, v]) => v !== undefined));
+  if (!Object.keys(fields).length) throw badRequest("Nothing to update.");
+  const sql = db();
+  const [row] = await sql`
+    update homepage_banners set ${sql(fields)} where id = ${id}
+    returning id, title, image_url, redirect_url, display_order, is_active, created_at`;
+  if (!row) throw notFound("Banner not found.");
+  await logAdminAction(admin.id, "Banner Updated", "Banner", id, fields);
+  return json(row);
+});
 
-    const { id } = await params;
-    const supabase = getSupabase();
-    const body = await request.json();
-
-    const updates: Record<string, unknown> = {};
-    if (body.title !== undefined) updates.title = body.title || null;
-    if (body.image_url !== undefined) updates.image_url = body.image_url;
-    if (body.redirect_url !== undefined) updates.redirect_url = body.redirect_url || null;
-    if (body.display_order !== undefined) updates.display_order = body.display_order;
-    if (body.is_active !== undefined) updates.is_active = body.is_active;
-
-    const { data, error } = await supabase
-      .from("homepage_banners")
-      .update(updates)
-      .eq("id", id)
-      .select("*")
-      .single();
-
-    if (error) {
-      console.error("Banner update error:", error);
-      return NextResponse.json({ error: "Failed to update banner" }, { status: 500 });
-    }
-
-    await logAdminAction(adminUser!.id, "update", "banner", id, updates);
-
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("Banner PUT error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-/**
- * DELETE /api/banners/[id]
- * Admin only: Delete a banner.
- */
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { error: authErr, user: adminUser } = await requireAdmin();
-    if (authErr) return authErr;
-
-    const { id } = await params;
-    const supabase = getSupabase();
-
-    const { error } = await supabase
-      .from("homepage_banners")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("Banner delete error:", error);
-      return NextResponse.json({ error: "Failed to delete banner" }, { status: 500 });
-    }
-
-    await logAdminAction(adminUser!.id, "delete", "banner", id);
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("Banner DELETE error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
+/** DELETE /api/banners/:id (admin) */
+export const DELETE = route<Ctx>(async (req, { params }) => {
+  const admin = await requireAdmin(req);
+  const id = assertUuid((await params).id, "banner id");
+  const r = await db()`delete from homepage_banners where id = ${id}`;
+  if (r.count === 0) throw notFound("Banner not found.");
+  await logAdminAction(admin.id, "Banner Deleted", "Banner", id);
+  return json({ success: true });
+});

@@ -35,12 +35,13 @@ function create(url: string) {
       numeric: { to: 1700, from: [1700], serialize: (x: unknown) => String(x), parse: toNumber },
       int8: { to: 20, from: [20], serialize: (x: unknown) => String(x), parse: toNumber },
     },
-  });
+    // The custom types above only change how values are parsed; expose the plain
+    // client type so pool and transactions share one call signature.
+  }) as unknown as postgres.Sql;
 }
 
-export type Sql = ReturnType<typeof create>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Tx = postgres.TransactionSql<any>;
+export type Sql = postgres.Sql;
+export type Tx = postgres.TransactionSql;
 /** Something that can run queries: the pool or an open transaction. */
 export type Queryable = Sql | Tx;
 
