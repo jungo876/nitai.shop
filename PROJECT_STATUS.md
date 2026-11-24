@@ -19,17 +19,29 @@ products, brands, banners and orders in an admin panel.
 **Goal of the current work:** take the codebase from "working demo" to a secure,
 tested, deployable website the business can take real orders on.
 
-## 2. Where we are / next step
+## 2. Where we are / next step  (PAUSED 2026-11-25, ~60% done)
 
-- **Current phase:** Phase 1 — critical architecture & bugs.
-- **Done so far:** see checklist below (Phase 0 complete).
-- **Next step:** frontend — OTP login modal, cart/checkout on the new payment
-  flow, admin pages on the new admin APIs, policy pages. (Backend complete:
-  commit af96eb8, 53 tests.) Until the frontend is updated, the local UI's
-  login/checkout do not work — expected mid-way state on this branch.
-- **2026-11-25:** live DB backed up (`backups/`, git-ignored) and migrations
-  001–003 applied. Public-key access to private data is now blocked (verified).
-  The old live site still lists products; its login/cart/old admin no longer work.
+**Done:** DB backed up + migrations 001-003 applied to Supabase (verified locked down);
+secure backend (OTP login, sessions, verified Razorpay payments, webhook, server
+pricing, admin APIs); storefront + admin UI rewired (commit f7ffc9c). 53 tests pass,
+0 lint errors, production build passes.
+
+**In progress (uncommitted work committed as WIP):** browser end-to-end tests.
+Written: scripts/e2e-server.mjs (isolated site: PGlite DB + fake Razorpay + next start),
+scripts/lib/seed-data.mjs, scripts/lib/razorpay-mock.mjs. Playwright + Chromium installed.
+
+**Resume here, in order:**
+1. playwright.config.ts + tests/e2e/*.spec.ts (browse, OTP login, profile, cart,
+   prepaid + COD checkout via fake checkout.js route, admin order handling,
+   store-closed, non-admin blocked); add `test:e2e` script; run and fix bugs found.
+2. Policy pages (Terms, Privacy, Refund/Cancellation, Shipping, Contact) + Footer links;
+   not-found.tsx / error.tsx.
+3. Security headers/CSP in next.config.ts (allow checkout.razorpay.com), poweredByHeader off;
+   src/instrumentation.ts calling productionConfigProblems().
+4. Real storage upload smoke test with the new secret key; delete test file.
+5. .env.example, README, docs/DEPLOYMENT.md (rollback, post-deploy checks), vercel.json
+   (cron for /api/cron/expire-orders, region), CI workflow, .gitattributes (LF).
+6. Final production-readiness audit; then ask owner before pushing/deploying.
 
 ## 3. Decisions
 
