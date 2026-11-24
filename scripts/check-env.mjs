@@ -17,7 +17,7 @@ nextEnv.loadEnvConfig(process.cwd(), !prod);
 const VARS = [
   { name: "DATABASE_URL", required: "always", purpose: "Postgres connection string (Supabase pooler URI)" },
   { name: "SUPABASE_URL", required: "always", purpose: "Supabase project URL (storage)", aliases: ["NEXT_PUBLIC_SUPABASE_URL"] },
-  { name: "SUPABASE_SERVICE_ROLE_KEY", required: "always", purpose: "Server-only key for Storage uploads" },
+  { name: "SUPABASE_SECRET_KEY", required: "always", purpose: "Server-only secret key (sb_secret_…) for Storage uploads", aliases: ["SUPABASE_SERVICE_ROLE_KEY"] },
   { name: "SESSION_SECRET", required: "prod", purpose: "Secret for hashing session tokens / OTP codes (32+ chars)" },
   { name: "APP_URL", required: "prod", purpose: "Public site URL, e.g. https://nck.example.com" },
   { name: "RAZORPAY_KEY_ID", required: "always", purpose: "Razorpay key id (rzp_test_… or rzp_live_…)" },
