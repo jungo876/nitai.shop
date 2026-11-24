@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { CATEGORIES, HOME_CATEGORIES } from "@/lib/types";
-import type { ProductWithVariants, Company } from "@/lib/types";
+import type { ProductWithVariants, Company, Product } from "@/lib/types";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
