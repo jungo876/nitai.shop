@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,10 @@ export async function DELETE(
   try {
     const { id: productId } = await params;
 
+    // Validate param
+    if (!z.string().uuid().safeParse(productId).success) {
+      return NextResponse.json({ success: false, error: "Invalid product ID" }, { status: 400 });
+    }
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {

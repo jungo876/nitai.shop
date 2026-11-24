@@ -161,7 +161,7 @@ export default function AccountSetupPage() {
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                s <= step ? "bg-gradient-to-r from-gradient-start to-gradient-end" : "bg-surface"
+                s <= step ? "bg-primary" : "bg-surface"
               }`}
             />
           ))}
@@ -224,7 +224,7 @@ export default function AccountSetupPage() {
                 setError("");
                 setStep(2);
               }}
-              className="w-full mt-6 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+              className="w-full mt-6 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
             >
               Continue
             </button>
@@ -310,7 +310,7 @@ export default function AccountSetupPage() {
                 setError("");
                 setStep(3);
               }}
-              className="w-full mt-6 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+              className="w-full mt-6 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
             >
               Continue
             </button>
@@ -379,7 +379,7 @@ export default function AccountSetupPage() {
             <button
               onClick={handleFinish}
               disabled={saving}
-              className="w-full mt-6 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg disabled:opacity-50 hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+              className="w-full mt-6 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg disabled:opacity-50 hover:shadow-xl active:scale-[0.98] transition-all duration-200"
             >
               {saving ? (
                 <span className="flex items-center justify-center gap-2">

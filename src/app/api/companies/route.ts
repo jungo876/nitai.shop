@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const { user: admin, error: authErr } = await requireAdmin();
+    if (authErr) return authErr;
+
     const supabase = getSupabase();
     const { name, logo_url } = await request.json();
 
@@ -41,6 +45,9 @@ export async function POST(request: Request) {
       console.error("Companies POST error:", error);
       return NextResponse.json({ error: error.message.includes("duplicate") ? "Company already exists" : "Failed to create company" }, { status: 500 });
     }
+
+    await logAdminAction(admin.id, "Company Created", "Company", data.id, { name: data.name });
+
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     console.error("Unexpected error:", err);

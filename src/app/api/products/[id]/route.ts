@@ -1,7 +1,31 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { validateBody } from "@/lib/validations";
+import { z } from "zod";
+import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
 
 export const dynamic = "force-dynamic";
+
+const updateProductSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(200),
+  category: z.string().trim().min(1, "Category is required").max(100),
+  description: z.string().max(5000, "Description too long").default(""),
+  image_url: z.string().url("Must be a valid URL").or(z.literal("")).default(""),
+  company_id: z.string().uuid("Invalid company ID").nullable().optional(),
+  is_top_selling: z.boolean().default(false),
+  status: z.enum(["active", "out_of_stock", "coming_soon", "hidden"]).default("active"),
+  home_category: z.string().trim().max(100).nullable().optional(),
+  variants: z.array(z.object({
+    label: z.string().trim().min(1, "Label is required").max(50),
+    unit_price: z.number().nonnegative("Price must be non-negative").default(0),
+    units_per_box: z.number().int().min(1, "Must be at least 1").default(1),
+    bulk_prices: z.array(z.object({
+      box_count: z.number().int().min(1),
+      price_per_unit: z.number().positive("Price must be positive"),
+      tag: z.string().max(30).optional().nullable(),
+    })).optional().default([]),
+  })).optional().default([]),
+});
 
 export async function GET(
   _request: Request,
@@ -9,6 +33,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
+    }
     const supabase = getSupabase();
 
     const { data, error } = await supabase
@@ -46,19 +73,25 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { user: admin, error: authErr } = await requireAdmin();
+    if (authErr) return authErr;
+
     const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
+    }
     const supabase = getSupabase();
     const body = await request.json();
-    const { name, category, description, image_url, company_id, is_top_selling, variants } = body;
 
-    if (!name || !category || !description) {
-      return NextResponse.json({ error: "Name, category, and description are required" }, { status: 400 });
-    }
+    // Validate input
+    const v = validateBody(updateProductSchema, body);
+    if (v.error) return v.error;
+    const { name, category, description, image_url, company_id, is_top_selling, status, home_category, variants } = v.data;
 
     // Update product
     const { data: updatedRows, error: updateError } = await supabase
       .from("products")
-      .update({ name, category, description, image_url: image_url || "", company_id: company_id || null, is_top_selling: is_top_selling || false })
+      .update({ name, category, description, image_url: image_url || "", company_id: company_id || null, is_top_selling: is_top_selling || false, status, home_category: home_category || null })
       .eq("id", id)
       .select();
 
@@ -93,7 +126,7 @@ export async function PUT(
         if (v.bulk_prices && Array.isArray(v.bulk_prices) && v.bulk_prices.length > 0) {
           const bulkData = v.bulk_prices
             .filter((bp: { box_count: number; price_per_unit: number }) => bp.box_count && bp.price_per_unit)
-            .map((bp: { box_count: number; price_per_unit: number; tag?: string }) => ({
+            .map((bp) => ({
               variant_id: variant.id,
               box_count: bp.box_count,
               price_per_unit: bp.price_per_unit,
@@ -113,6 +146,8 @@ export async function PUT(
       .eq("id", id)
       .single();
 
+    await logAdminAction(admin.id, "Product Updated", "Product", id, { name: full?.name || name });
+
     return NextResponse.json(full);
   } catch (err) {
     console.error("Unexpected error:", err);
@@ -125,7 +160,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { user: admin, error: authErr } = await requireAdmin();
+    if (authErr) return authErr;
+
     const { id } = await params;
+    if (!z.string().uuid().safeParse(id).success) {
+      return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
+    }
     const supabase = getSupabase();
 
     // CASCADE handles variants + bulk_prices
@@ -135,6 +176,8 @@ export async function DELETE(
       console.error("Product delete error:", error);
       return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
     }
+
+    await logAdminAction(admin.id, "Product Deleted", "Product", id);
 
     return NextResponse.json({ success: true });
   } catch (err) {

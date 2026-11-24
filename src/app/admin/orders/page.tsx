@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect, useMemo, type FormEvent } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 const ADMIN_PW_KEY = "nck_admin";
 const ORDER_STATUSES = ["placed","confirmed","processing","shipped","delivered","cancelled"] as const;
 const PAY_STATUSES = ["pending","advance_paid","partially_paid","fully_paid","failed"] as const;
-const FILTERS = ["all","cod","razorpay","pending","fully_paid","processing","delivered"] as const;
+const FILTERS = ["all","pending","advance_paid","fully_paid","processing","delivered"] as const;
 type Filter = typeof FILTERS[number];
 
 function sColor(s:string){const m:Record<string,string>={placed:"bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",confirmed:"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",processing:"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",shipped:"bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",delivered:"bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",cancelled:"bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"};return m[s]||"bg-gray-100 text-gray-700";}
@@ -14,22 +15,35 @@ function label(s:string){return s.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpper
 function fmt(n:number){return Number(n).toLocaleString("en-IN");}
 
 export default function AdminOrdersPage(){
-  const[isAuth,setIsAuth]=useState(false);
-  const[pw,setPw]=useState("");
-  const[authErr,setAuthErr]=useState("");
+  const { user, isLoggedIn, isLoading: authLoadContext, logout } = useAuth();
+  const isAuth = isLoggedIn && user?.is_admin === true;
+
   const[orders,setOrders]=useState<any[]>([]);
   const[loading,setLoading]=useState(true);
   const[filter,setFilter]=useState<Filter>("all");
   const[search,setSearch]=useState("");
   const[selected,setSelected]=useState<any>(null);
   const[updating,setUpdating]=useState("");
+  const[delConfirm,setDelConfirm]=useState<string|null>(null);
+  const[msg,setMsg]=useState<{type:"success"|"error",text:string}|null>(null);
 
-  async function handleLogin(e:FormEvent){
-    e.preventDefault();setAuthErr("");
-    const r=await fetch("/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pw})});
-    if(r.ok){setIsAuth(true);}else{setAuthErr("Wrong password");}
+  async function handleDelete(id: string) {
+    try {
+      const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete");
+      }
+      setOrders(prev => prev.filter(o => o.id !== id));
+      setMsg({ type: "success", text: "Order deleted successfully." });
+      setDelConfirm(null);
+      setSelected(null);
+      setTimeout(() => setMsg(null), 3000);
+    } catch (err: any) {
+      setMsg({ type: "error", text: err.message || "Failed to delete" });
+      setTimeout(() => setMsg(null), 3000);
+    }
   }
-
   async function fetchOrders(){
     setLoading(true);
     try{const r=await fetch("/api/admin/orders");if(r.ok){const d=await r.json();setOrders(d.orders||[]);}}catch{}finally{setLoading(false);}
@@ -57,9 +71,8 @@ export default function AdminOrdersPage(){
 
   const filtered=useMemo(()=>{
     let list=orders;
-    if(filter==="cod")list=list.filter(o=>o.payment_method==="cash_on_delivery");
-    else if(filter==="razorpay")list=list.filter(o=>o.payment_method==="razorpay");
-    else if(filter==="pending")list=list.filter(o=>o.payment_status==="pending");
+    if(filter==="pending")list=list.filter(o=>o.payment_status==="pending"||o.payment_status==="advance_paid");
+    else if(filter==="advance_paid")list=list.filter(o=>o.payment_status==="advance_paid");
     else if(filter==="fully_paid")list=list.filter(o=>o.payment_status==="fully_paid");
     else if(filter==="processing")list=list.filter(o=>o.order_status==="processing");
     else if(filter==="delivered")list=list.filter(o=>o.order_status==="delivered");
@@ -69,53 +82,37 @@ export default function AdminOrdersPage(){
 
   const stats=useMemo(()=>({
     total:orders.length,
-    pending:orders.filter(o=>o.payment_status==="pending").length,
-    cod:orders.filter(o=>o.payment_method==="cash_on_delivery").length,
+    remaining:orders.filter(o=>o.payment_status==="advance_paid").length,
+    collected:orders.reduce((s,o)=>s+Number(o.advance_amount),0),
     revenue:orders.reduce((s,o)=>s+Number(o.total_amount),0),
     today:orders.filter(o=>new Date(o.created_at).toDateString()===new Date().toDateString()).length,
   }),[orders]);
 
-  function exportCSV(){
-    const rows=[["Order ID","Customer","Shop","Phone","GST","Total","Advance","Remaining","Payment Method","Payment Status","Order Status","Date"]];
-    for(const o of filtered){
-      rows.push([o.id.slice(0,8).toUpperCase(),o.customer_name,o.shop_name,o.customer_phone,o.gst_number,o.total_amount,o.advance_amount,o.remaining_amount,o.payment_method==="cash_on_delivery"?"COD":"Razorpay",label(o.payment_status),label(o.order_status),new Date(o.created_at).toLocaleDateString("en-IN")]);
+  async function exportCSV(){
+    try {
+      const res = await fetch("/api/admin/export", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to export");
+      const { orders: exportData } = await res.json();
+      const csv = ["ID,Date,Customer,Phone,Amount,Advance,Remaining,Pay Status,Order Status"];
+      exportData.forEach((o:any)=>csv.push(`${o.id.split("-")[0]},${new Date(o.created_at).toLocaleDateString()},"${o.users?.name||""}",${o.users?.phone_number||""},${o.total_amount},${o.advance_payment_amount||0},${o.total_amount-(o.advance_payment_amount||0)},${o.payment_status},${o.order_status}`));
+      const blob=new Blob([csv.join("\n")],{type:"text/csv"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;a.download=`NCK_Orders_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    } catch (err) {
+      console.error(err);
+      alert("Export failed");
     }
-    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
-    const blob=new Blob([csv],{type:"text/csv"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");a.href=url;a.download=`nck_orders_${new Date().toISOString().slice(0,10)}.csv`;a.click();
   }
 
   const ic="w-full rounded-xl border border-card-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted/50 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all";
 
-  if(!isAuth)return(
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8"><div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gradient-start to-gradient-end shadow-lg"><svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg></div><h1 className="text-2xl font-bold text-foreground">Admin Orders</h1><p className="mt-1 text-sm text-muted">Enter admin password</p></div>
-        <form onSubmit={handleLogin} className="rounded-2xl border border-card-border bg-card-bg p-6 shadow-sm">
-          {authErr&&<div className="mb-4 rounded-xl border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-400">⚠ {authErr}</div>}
-          <div className="mb-4"><input type="password" value={pw} onChange={e=>setPw(e.target.value)} required placeholder="Admin password" className={ic} /></div>
-          <button type="submit" className="w-full rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all">Login</button>
-        </form>
-        <div className="mt-4 text-center"><Link href="/admin" className="text-sm text-muted hover:text-primary">← Products Admin</Link></div>
-      </div>
-    </div>
-  );
-
   return(
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-50 border-b border-card-border bg-background/90 backdrop-blur-xl shadow-sm">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-gradient-start to-gradient-end shadow-sm"><svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" /></svg></div><span className="font-bold text-foreground hidden sm:block">Orders Dashboard</span></div>
-          <div className="flex items-center gap-3"><Link href="/admin" className="text-sm text-muted hover:text-primary">Products</Link><Link href="/" className="text-sm text-muted hover:text-primary">Website</Link><button onClick={()=>setIsAuth(false)} className="rounded-lg border border-card-border px-3 py-1.5 text-sm text-muted hover:text-red-500">Logout</button></div>
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
         {/* Analytics */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-          {[{l:"Total Orders",v:stats.total,c:"text-foreground"},{l:"Pending Pay",v:stats.pending,c:"text-amber-600"},{l:"COD Orders",v:stats.cod,c:"text-blue-600"},{l:"Revenue",v:`₹${fmt(stats.revenue)}`,c:"text-primary"},{l:"Today",v:stats.today,c:"text-purple-600"}].map(s=>(
+          {[{l:"Total Orders",v:stats.total,c:"text-foreground"},{l:"Balance Due",v:stats.remaining,c:"text-amber-600"},{l:"Advance Collected",v:`₹${fmt(stats.collected)}`,c:"text-blue-600"},{l:"Revenue",v:`₹${fmt(stats.revenue)}`,c:"text-primary"},{l:"Today",v:stats.today,c:"text-purple-600"}].map(s=>(
             <div key={s.l} className="rounded-xl border border-card-border bg-card-bg p-4"><p className="text-[11px] font-medium text-muted uppercase tracking-wider">{s.l}</p><p className={`text-xl font-extrabold mt-1 ${s.c}`}>{s.v}</p></div>
           ))}
         </div>
@@ -123,7 +120,7 @@ export default function AdminOrdersPage(){
         {/* Filters + Search + Export */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
-            {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${filter===f?"bg-primary text-white":"bg-surface text-muted hover:text-foreground border border-card-border"}`}>{f==="all"?"All":f==="cod"?"COD":f==="razorpay"?"Razorpay":label(f)}</button>)}
+            {FILTERS.map(f=><button key={f} onClick={()=>setFilter(f)} className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${filter===f?"bg-primary text-white":"bg-surface text-muted hover:text-foreground border border-card-border"}`}>{f==="all"?"All":f==="advance_paid"?"Advance Paid":label(f)}</button>)}
           </div>
           <div className="flex gap-2">
             <input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search orders..." className="rounded-full border border-card-border bg-surface px-4 py-1.5 text-sm outline-none focus:border-primary w-full sm:w-56" />
@@ -131,7 +128,13 @@ export default function AdminOrdersPage(){
           </div>
         </div>
 
-        {/* Orders */}
+        {msg && (
+        <div className={`mb-4 rounded-lg px-4 py-3 text-sm font-medium ${msg.type === "success" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* Orders */}
         {loading?(
           <div className="space-y-3">{[1,2,3,4].map(i=><div key={i} className="h-20 bg-surface animate-shimmer rounded-xl" />)}</div>
         ):filtered.length===0?(
@@ -147,7 +150,7 @@ export default function AdminOrdersPage(){
                       <button onClick={()=>setSelected(o)} className="text-xs font-mono text-primary hover:underline cursor-pointer">#{o.id.slice(0,8).toUpperCase()}</button>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${sColor(o.order_status)}`}>{o.order_status}</span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${pColor(o.payment_status)}`}>{label(o.payment_status)}</span>
-                      {o.payment_method==="cash_on_delivery"&&<span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-400">COD</span>}
+                      {o.remaining_payment_method&&<span className="inline-flex items-center rounded-full bg-cyan-100 dark:bg-cyan-900/30 px-1.5 py-0.5 text-[9px] font-bold text-cyan-700 dark:text-cyan-400 capitalize">{(o.remaining_payment_method||'').replace(/_/g,' ')}</span>}
                     </div>
                     <p className="text-sm font-semibold text-foreground truncate">{o.customer_name} {o.shop_name&&<span className="text-muted font-normal">• {o.shop_name}</span>}</p>
                     <p className="text-xs text-muted">{o.customer_phone} • {new Date(o.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</p>
@@ -155,7 +158,7 @@ export default function AdminOrdersPage(){
                   {/* Amount */}
                   <div className="text-right shrink-0">
                     <p className="text-lg font-extrabold text-foreground">₹{fmt(o.total_amount)}</p>
-                    {o.payment_method==="razorpay"&&<p className="text-[11px] text-muted">Adv: ₹{fmt(o.advance_amount)} | Due: ₹{fmt(o.remaining_amount)}</p>}
+                    <p className="text-[11px] text-muted">Adv: ₹{fmt(o.advance_amount)} | Due: ₹{fmt(o.remaining_amount)}</p>
                   </div>
                   {/* Quick Actions */}
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -169,7 +172,6 @@ export default function AdminOrdersPage(){
             ))}
           </div>
         )}
-      </div>
 
       {/* Detail Modal */}
       {selected&&(
@@ -220,7 +222,8 @@ export default function AdminOrdersPage(){
                   <div className="flex justify-between"><span className="text-muted">Total</span><span className="font-bold">₹{fmt(selected.total_amount)}</span></div>
                   <div className="flex justify-between"><span className="text-muted">Advance</span><span className="font-semibold text-primary">₹{fmt(selected.advance_amount)}</span></div>
                   <div className="flex justify-between"><span className="text-muted">Remaining</span><span className="font-semibold">₹{fmt(selected.remaining_amount)}</span></div>
-                  <div className="flex justify-between"><span className="text-muted">Method</span><span className="font-semibold capitalize">{selected.payment_method==="cash_on_delivery"?"COD":"Razorpay"}</span></div>
+                  <div className="flex justify-between"><span className="text-muted">Advance via</span><span className="font-semibold">Razorpay</span></div>
+                  <div className="flex justify-between"><span className="text-muted">Remaining via</span><span className="font-semibold capitalize">{(selected.remaining_payment_method||'cash_on_delivery').replace(/_/g,' ')}</span></div>
                   {selected.razorpay_payment_id&&<div className="flex justify-between"><span className="text-muted">Razorpay ID</span><span className="font-mono text-xs">{selected.razorpay_payment_id}</span></div>}
                 </div>
               </section>
@@ -242,6 +245,27 @@ export default function AdminOrdersPage(){
                   </div>
                 </div>
               </section>
+              {/* Delete Order Action */}
+              {process.env.NODE_ENV !== 'production' && (
+                <section className="border-t border-card-border pt-4 mt-4">
+                  <div className="flex flex-col gap-3">
+                    {delConfirm === selected.id ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-900/10">
+                        <h4 className="text-sm font-bold text-red-800 dark:text-red-400 mb-1">Delete Order</h4>
+                        <p className="text-xs text-red-600 dark:text-red-400/80 mb-3">Are you sure you want to permanently delete this order?</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setDelConfirm(null)} className="flex-1 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
+                          <button onClick={() => handleDelete(selected.id)} className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow hover:bg-red-700 transition-colors">Delete</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setDelConfirm(selected.id)} className="w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400 dark:hover:bg-red-900/20">
+                        Delete Order (Dev Only)
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
           </div>
         </div>

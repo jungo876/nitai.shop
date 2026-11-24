@@ -197,7 +197,7 @@ export default function ProductDetailsPage({ params }: { params: Promise<{ id: s
               src={product.image_url}
               alt={product.name}
               fill
-              className="object-cover"
+              className={`object-contain p-4 mix-blend-multiply ${product.status && product.status !== 'active' ? 'grayscale opacity-70' : ''}`}
               sizes="(max-width: 768px) 100vw, 768px"
               priority
             />
@@ -208,8 +208,18 @@ export default function ProductDetailsPage({ params }: { params: Promise<{ id: s
               </svg>
             </div>
           )}
-          {/* Category Badge */}
-          <div className="absolute top-4 left-4">
+          {/* Badges */}
+          <div className="absolute top-4 left-4 flex flex-col gap-2 items-start">
+            {product.status === 'out_of_stock' && (
+              <span className="inline-flex items-center rounded bg-red-600/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm shadow-md">
+                OUT OF STOCK
+              </span>
+            )}
+            {product.status === 'coming_soon' && (
+              <span className="inline-flex items-center rounded bg-yellow-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm shadow-md">
+                COMING SOON
+              </span>
+            )}
             <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm ${getCategoryColor(product.category)}`}>
               {translatedCategory}
             </span>
@@ -248,8 +258,18 @@ export default function ProductDetailsPage({ params }: { params: Promise<{ id: s
 
         {/* Product Info */}
         <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight mb-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight mb-2 flex items-center gap-3 flex-wrap">
             {product.name}
+            {product.status === 'out_of_stock' && (
+              <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800">
+                🔴 Out of Stock
+              </span>
+            )}
+            {product.status === 'coming_soon' && (
+              <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800">
+                🟡 Coming Soon
+              </span>
+            )}
           </h1>
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${getCategoryColor(product.category)}`}>
@@ -334,7 +354,7 @@ export default function ProductDetailsPage({ params }: { params: Promise<{ id: s
 
         {/* Order Summary / Total */}
         {hasVariants && (
-          <div className="rounded-2xl border border-card-border bg-gradient-to-br from-primary-light to-surface p-4 sm:p-6 mb-6">
+          <div className="rounded-2xl border border-card-border bg-surface p-4 sm:p-6 mb-6">
             <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-4">Order Summary</h3>
             <div className="space-y-2.5">
               <div className="flex justify-between text-sm">
@@ -370,75 +390,89 @@ export default function ProductDetailsPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Add to Cart / Buy Now Buttons */}
-        <div className="mb-8 flex gap-3">
-          <button
-            onClick={async () => {
-              if (!isLoggedIn) {
-                requireAuth({ type: "cart", productId: id, returnUrl: `/products/${id}` });
-                return;
-              }
-              if (user && !user.is_profile_complete) {
-                router.push("/account/setup");
-                return;
-              }
-              if (!activeVariant) return;
-              setAddingToCart(true);
-              const success = await addToCart({
-                product_id: product.id,
-                variant_id: activeVariant.id,
-                bulk_price_id: hasBulk ? sortedBulk[selectedBulkIdx].id : null,
-                box_count: currentBoxCount,
-              });
-              setAddingToCart(false);
-              if (success) {
-                setAddedToCart(true);
-                setTimeout(() => setAddedToCart(false), 2000);
-              }
-            }}
-            disabled={addingToCart || !hasVariants}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-primary bg-primary-light px-4 py-4 text-base font-bold text-primary hover:bg-primary hover:text-white active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-50"
-          >
-            {addingToCart ? (
-              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : addedToCart ? (
-              <>
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+        {product.status === 'out_of_stock' ? (
+          <div className="flex gap-3 mb-8">
+            <button disabled className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-surface border-2 border-card-border px-4 py-4 text-base font-bold text-muted cursor-not-allowed">
+              Currently Unavailable
+            </button>
+          </div>
+        ) : product.status === 'coming_soon' ? (
+          <div className="flex gap-3 mb-8">
+            <button disabled className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-yellow-500/10 border-2 border-yellow-500/20 px-4 py-4 text-base font-bold text-yellow-700 dark:text-yellow-500 cursor-not-allowed">
+              Coming Soon
+            </button>
+          </div>
+        ) : (
+          <div className="mb-8 flex gap-3">
+            <button
+              onClick={async () => {
+                if (!isLoggedIn) {
+                  requireAuth({ type: "cart", productId: id, returnUrl: `/products/${id}` });
+                  return;
+                }
+                if (user && !user.is_profile_complete) {
+                  router.push("/account/setup");
+                  return;
+                }
+                if (!activeVariant) return;
+                setAddingToCart(true);
+                const success = await addToCart({
+                  product_id: product.id,
+                  variant_id: activeVariant.id,
+                  bulk_price_id: hasBulk ? sortedBulk[selectedBulkIdx].id : null,
+                  box_count: currentBoxCount,
+                });
+                setAddingToCart(false);
+                if (success) {
+                  setAddedToCart(true);
+                  setTimeout(() => setAddedToCart(false), 2000);
+                }
+              }}
+              disabled={addingToCart || !hasVariants}
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-primary bg-primary-light px-4 py-4 text-base font-bold text-primary hover:bg-primary hover:text-white active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-50"
+            >
+              {addingToCart ? (
+                <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Added!
-              </>
-            ) : (
-              <>
-                <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                </svg>
-                Add to Cart
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => {
-              if (!isLoggedIn) {
-                requireAuth({ type: "buy", productId: id, returnUrl: `/products/${id}` });
-                return;
-              }
-              if (user && !user.is_profile_complete) {
-                router.push("/account/setup");
-                return;
-              }
-              window.open(waUrl, "_blank");
-            }}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 text-base font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary-hover hover:shadow-xl active:scale-[0.98] transition-all duration-200 cursor-pointer"
-          >
-            Buy Now
-            {hasVariants && (
-              <span className="opacity-80">• ₹{totalPrice.toLocaleString("en-IN")}</span>
-            )}
-          </button>
-        </div>
+              ) : addedToCart ? (
+                <>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                  </svg>
+                  Added!
+                </>
+              ) : (
+                <>
+                  <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                  </svg>
+                  Add to Cart
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                if (!isLoggedIn) {
+                  requireAuth({ type: "buy", productId: id, returnUrl: `/products/${id}` });
+                  return;
+                }
+                if (user && !user.is_profile_complete) {
+                  router.push("/account/setup");
+                  return;
+                }
+                window.open(waUrl, "_blank");
+              }}
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-4 text-base font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary-hover hover:shadow-xl active:scale-[0.98] transition-all duration-200 cursor-pointer"
+            >
+              Buy Now
+              {hasVariants && (
+                <span className="opacity-80">• ₹{totalPrice.toLocaleString("en-IN")}</span>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* ═══════════ You May Also Like ═══════════ */}
         {recommended.length > 0 && (

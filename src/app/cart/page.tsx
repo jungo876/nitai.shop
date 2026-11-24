@@ -75,7 +75,7 @@ export default function CartPage() {
           </p>
           <Link
             href="/"
-            className="rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-8 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+            className="rounded-xl bg-primary px-8 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
           >
             Browse Products
           </Link>
@@ -228,7 +228,7 @@ export default function CartPage() {
             onClick={() => {
               router.push("/checkout");
             }}
-            className="w-full rounded-2xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2"
+            className="w-full rounded-2xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />

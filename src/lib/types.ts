@@ -9,10 +9,12 @@ export interface Product {
   id: string;
   name: string;
   category: string;
+  home_category?: string | null;
   description: string;
   image_url: string;
   company_id: string | null;
   is_top_selling?: boolean;
+  status?: 'active' | 'out_of_stock' | 'coming_soon' | 'hidden';
   created_at: string;
 }
 
@@ -57,6 +59,15 @@ export const CATEGORIES = [
 
 export type Category = (typeof CATEGORIES)[number];
 
+export const HOME_CATEGORIES = [
+  "Crop Protection",
+  "Crop Nutrition",
+  "Seeds",
+  "Agro Tools",
+] as const;
+
+export type HomeCategory = (typeof HOME_CATEGORIES)[number];
+
 /* ─── Auth / User Types ─── */
 
 export interface AppUser {
@@ -67,6 +78,7 @@ export interface AppUser {
   email: string | null;
   avatar_url: string | null;
   is_profile_complete: boolean;
+  is_admin?: boolean;
   created_at?: string;
 }
 
@@ -100,6 +112,7 @@ export interface UserAddress {
 
 export type PaymentStatus = "pending" | "advance_paid" | "partially_paid" | "fully_paid" | "failed";
 export type OrderStatus = "placed" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+export type RemainingPaymentMethod = "cash_on_delivery" | "upi" | "bank_transfer" | "cash";
 
 export interface Order {
   id: string;
@@ -113,6 +126,7 @@ export interface Order {
   order_status: OrderStatus;
   
   payment_method: string | null;
+  remaining_payment_method: string | null;
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
   

@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimit, orderLimiter } from "@/lib/rate-limit";
+import { validateBody } from "@/lib/validations";
+import { updateOrderStatusSchema } from "@/lib/validations/order";
+import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "nckadmin123";
-
-async function isAdmin() {
-  const c = await cookies();
-  return c.get("nck_admin")?.value === ADMIN_PASSWORD;
-}
-
 /** GET /api/admin/orders — fetch all orders with user/business/address */
 export async function GET() {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const blocked = await rateLimit(orderLimiter);
+  if (blocked) return blocked;
+  const { error: authErr } = await requireAdmin();
+  if (authErr) return authErr;
 
   const supabase = getSupabase();
   const { data: orders, error } = await supabase
@@ -49,20 +49,28 @@ export async function GET() {
 
 /** PATCH /api/admin/orders — update order/payment status */
 export async function PATCH(request: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const blocked = await rateLimit(orderLimiter);
+  if (blocked) return blocked;
+  const { user: admin, error: authErr } = await requireAdmin();
+  if (authErr) return authErr;
 
-  const { order_id, order_status, payment_status } = await request.json();
-  if (!order_id) return NextResponse.json({ error: "order_id required" }, { status: 400 });
+  const body = await request.json();
+
+  // Validate input
+  const v = validateBody(updateOrderStatusSchema, body);
+  if (v.error) return v.error;
+  const { order_id, order_status, payment_status } = v.data;
 
   const supabase = getSupabase();
   const updates: Record<string, string> = {};
   if (order_status) updates.order_status = order_status;
   if (payment_status) updates.payment_status = payment_status;
 
-  if (Object.keys(updates).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
-
   const { error } = await supabase.from("orders").update(updates).eq("id", order_id);
   if (error) return NextResponse.json({ error: "Update failed" }, { status: 500 });
+
+  if (order_status) await logAdminAction(admin.id, "Order Status Changed", "Order", order_id, { new_status: order_status });
+  if (payment_status) await logAdminAction(admin.id, "Payment Status Changed", "Order", order_id, { new_status: payment_status });
 
   return NextResponse.json({ success: true });
 }

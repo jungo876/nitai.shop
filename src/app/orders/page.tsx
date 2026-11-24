@@ -58,7 +58,7 @@ export default function OrdersPage() {
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">No orders yet</h2>
             <p className="text-muted text-sm mb-6">Start shopping to see your orders here.</p>
-            <Link href="/" className="rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-8 py-3 text-sm font-bold text-white shadow-lg">Browse Products</Link>
+            <Link href="/" className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-white shadow-lg">Browse Products</Link>
           </div>
         ) : (
           <div className="space-y-4">

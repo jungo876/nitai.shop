@@ -107,13 +107,13 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
       {/* Clickable product link */}
       <Link href={`/products/${product.id}`} className="flex flex-col flex-1">
         {/* Image */}
-        <div className="relative h-[140px] sm:h-[160px] w-full overflow-hidden bg-surface">
+        <div className="relative h-[140px] sm:h-[160px] w-full overflow-hidden bg-white">
           {product.image_url ? (
             <Image
               src={product.image_url}
               alt={product.name}
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              className={`object-contain p-2 mix-blend-multiply transition-transform duration-500 group-hover:scale-105 ${product.status && product.status !== 'active' ? 'grayscale opacity-70' : ''}`}
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             />
           ) : (
@@ -123,8 +123,18 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
               </svg>
             </div>
           )}
-          {/* Category Badge */}
-          <div className="absolute top-2 left-2">
+          {/* Badges */}
+          <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+            {product.status === 'out_of_stock' && (
+              <span className="inline-flex items-center rounded bg-red-600/90 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm shadow-sm">
+                OUT OF STOCK
+              </span>
+            )}
+            {product.status === 'coming_soon' && (
+              <span className="inline-flex items-center rounded bg-yellow-500/90 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm shadow-sm">
+                COMING SOON
+              </span>
+            )}
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${getCategoryColor(product.category)}`}>
               {translatedCategory}
             </span>

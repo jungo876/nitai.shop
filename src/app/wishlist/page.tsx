@@ -109,7 +109,7 @@ export default function WishlistPage() {
           </p>
           <Link
             href="/"
-            className="rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-8 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+            className="rounded-xl bg-primary px-8 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
           >
             Explore Products
           </Link>

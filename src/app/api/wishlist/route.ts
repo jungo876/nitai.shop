@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimit, searchLimiter } from "@/lib/rate-limit";
+import { validateBody } from "@/lib/validations";
+import { wishlistSchema } from "@/lib/validations/product";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
+    const blocked = await rateLimit(searchLimiter);
+    if (blocked) return blocked;
+
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {
@@ -99,6 +105,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
+    const blocked = await rateLimit(searchLimiter);
+    if (blocked) return blocked;
+
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {
@@ -116,10 +125,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { product_id } = await request.json();
-    if (!product_id) {
-      return NextResponse.json({ error: "product_id required" }, { status: 400 });
-    }
+    const body = await request.json();
+
+    // Validate input
+    const v = validateBody(wishlistSchema, body);
+    if (v.error) return v.error;
+    const { product_id } = v.data;
 
     const { error } = await supabase
       .from("wishlist_items")

@@ -1,27 +1,27 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { validateBody } from "@/lib/validations";
+import { setupSchema } from "@/lib/validations/account";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/auth/setup
- * Body: { user_id, name, whatsapp_number, shop_name, gst_number, pan_number, business_type,
- *         address_line, landmark, city, state, pincode }
- * 
  * Creates business profile + address, marks user profile as complete.
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // Validate input
+    const v = validateBody(setupSchema, body);
+    if (v.error) return v.error;
+
     const {
       user_id, name, whatsapp_number,
       shop_name, gst_number, pan_number, business_type,
       address_line, landmark, city, state, pincode,
-    } = body;
-
-    if (!user_id || !name || !shop_name) {
-      return NextResponse.json({ error: "Name, user_id, and shop name are required" }, { status: 400 });
-    }
+    } = v.data;
 
     const supabase = getSupabase();
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimit, orderLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST() {
   try {
+    const blocked = await rateLimit(orderLimiter);
+    if (blocked) return blocked;
+
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {
@@ -124,9 +128,6 @@ export async function POST() {
       });
     }
 
-    const advanceAmount = Math.round(subtotal * 0.25);
-    const remainingAmount = subtotal - advanceAmount;
-
     return NextResponse.json({
       user: {
         id: user.id,
@@ -138,8 +139,6 @@ export async function POST() {
       address: address || null,
       items: validatedItems,
       subtotal,
-      advance_amount: advanceAmount,
-      remaining_amount: remainingAmount,
       item_count: validatedItems.reduce((sum, i) => sum + i.quantity, 0),
     });
   } catch (err) {

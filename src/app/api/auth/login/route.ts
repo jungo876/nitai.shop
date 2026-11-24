@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimitLogin } from "@/lib/rate-limit";
+import { validateBody } from "@/lib/validations";
+import { loginSchema } from "@/lib/validations/account";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/auth/login
  * Body: { phone_number: string }
- * 
- * Finds or creates a user by phone number.
- * Returns the user object (with is_profile_complete flag).
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { phone_number } = body;
 
-    if (!phone_number || typeof phone_number !== "string" || phone_number.trim().length < 10) {
-      return NextResponse.json({ error: "Valid phone number is required" }, { status: 400 });
-    }
+    // Validate input
+    const v = validateBody(loginSchema, body);
+    if (v.error) return v.error;
+    const { phone_number } = v.data;
+
+    // Rate limit using phone+IP composite key
+    const blocked = await rateLimitLogin(phone_number);
+    if (blocked) return blocked;
+
 
     const cleanPhone = phone_number.replace(/\D/g, "").slice(-10); // normalize to last 10 digits
     const supabase = getSupabase();

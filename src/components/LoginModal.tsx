@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { IconPackage, IconTag, IconHandshake, IconStar } from "@/components/icons";
 
 export default function LoginModal() {
   const { showLoginModal, closeLoginModal, loginWithPhone, pendingAction, clearPendingAction } = useAuth();
@@ -76,7 +77,7 @@ export default function LoginModal() {
             <div className="px-6 pb-8 pt-2">
               {/* Header */}
               <div className="text-center mb-6">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gradient-start to-gradient-end shadow-lg">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary shadow-lg">
                   <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                   </svg>
@@ -121,7 +122,7 @@ export default function LoginModal() {
                 <button
                   type="submit"
                   disabled={loading || phone.length < 10}
-                  className="w-full rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg disabled:opacity-50 hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+                  className="w-full rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg disabled:opacity-50 hover:shadow-xl active:scale-[0.98] transition-all duration-200"
                 >
                   {loading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -140,13 +141,13 @@ export default function LoginModal() {
               {/* Benefits */}
               <div className="mt-6 grid grid-cols-2 gap-2.5">
                 {[
-                  { icon: "⚡", text: "Faster checkout" },
-                  { icon: "📦", text: "Order tracking" },
-                  { icon: "📍", text: "Saved addresses" },
-                  { icon: "🧾", text: "GST billing" },
+                  { icon: IconStar, text: "Faster checkout" },
+                  { icon: IconPackage, text: "Order tracking" },
+                  { icon: IconHandshake, text: "Saved addresses" },
+                  { icon: IconTag, text: "GST billing" },
                 ].map((b) => (
                   <div key={b.text} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2">
-                    <span className="text-sm">{b.icon}</span>
+                    <b.icon className="h-4 w-4 text-primary" />
                     <span className="text-xs font-medium text-muted">{b.text}</span>
                   </div>
                 ))}

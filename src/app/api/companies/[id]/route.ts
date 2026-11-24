@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { requireAdmin, logAdminAction } from "@/lib/auth/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { user: admin, error: authErr } = await requireAdmin();
+    if (authErr) return authErr;
+
     const { id } = await params;
     const supabase = getSupabase();
     const { name, logo_url } = await request.json();
@@ -52,6 +56,9 @@ export async function PUT(
       console.error("Company update error:", error);
       return NextResponse.json({ error: "Failed to update company" }, { status: 500 });
     }
+
+    await logAdminAction(admin.id, "Company Updated", "Company", id, { name: data.name });
+
     return NextResponse.json(data);
   } catch (err) {
     console.error("Unexpected error:", err);
@@ -64,6 +71,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { user: admin, error: authErr } = await requireAdmin();
+    if (authErr) return authErr;
+
     const { id } = await params;
     const supabase = getSupabase();
 
@@ -73,6 +83,9 @@ export async function DELETE(
       console.error("Company delete error:", error);
       return NextResponse.json({ error: "Failed to delete company" }, { status: 500 });
     }
+
+    await logAdminAction(admin.id, "Company Deleted", "Company", id);
+
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Unexpected error:", err);

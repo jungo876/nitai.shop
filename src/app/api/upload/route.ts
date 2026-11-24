@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const { error: authErr } = await requireAdmin();
+    if (authErr) return authErr;
+
     const supabase = getSupabase();
     const formData = await request.formData();
     const file = formData.get("file") as File | null;

@@ -114,7 +114,7 @@ export default function HeroCarousel() {
                 </p>
                 <a
                   href={slide.ctaHref}
-                  className={`mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 active:scale-[0.97] transition-all duration-700 ${
+                  className={`mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 active:scale-[0.97] transition-all duration-700 ${
                     i === current
                       ? "translate-y-0 opacity-100 delay-[400ms]"
                       : "translate-y-6 opacity-0"
@@ -170,7 +170,7 @@ export default function HeroCarousel() {
       {/* Progress Bar */}
       <div className="absolute bottom-0 left-0 z-20 h-1 w-full bg-white/10">
         <div
-          className="h-full bg-gradient-to-r from-gradient-start to-gradient-end transition-all duration-300"
+          className="h-full bg-primary transition-all duration-300"
           style={{ width: `${((current + 1) / slides.length) * 100}%` }}
         />
       </div>

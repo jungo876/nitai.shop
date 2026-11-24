@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
 import Razorpay from "razorpay";
+import { rateLimit, paymentCreateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +14,17 @@ const razorpay = new Razorpay({
 /**
  * POST /api/payment/create-order
  *
- * Creates a Razorpay order for the 25% advance amount.
+ * Accepts { payment_method: "prepaid" | "cod" }
+ * - prepaid → Razorpay order for 100% of subtotal
+ * - cod     → Razorpay order for 10% advance
+ *
  * Recalculates totals from DB — never trusts frontend.
  */
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const blocked = await rateLimit(paymentCreateLimiter);
+    if (blocked) return blocked;
+
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {
@@ -39,6 +46,15 @@ export async function POST() {
 
     if (!user.is_profile_complete) {
       return NextResponse.json({ error: "Profile incomplete" }, { status: 403 });
+    }
+
+    // Parse body for payment_method
+    let paymentMethod = "prepaid";
+    try {
+      const body = await request.json();
+      if (body.payment_method === "cod") paymentMethod = "cod";
+    } catch {
+      // If no body or parse error, default to prepaid
     }
 
     // 2. Get cart items and calculate server-side totals
@@ -74,32 +90,45 @@ export async function POST() {
       subtotal += totalUnits * pricePerUnit;
     }
 
-    const advanceAmount = Math.round(subtotal * 0.25);
+    // Calculate amount based on payment method
+    const chargeAmount = paymentMethod === "cod"
+      ? Math.round(subtotal * 0.10) // 10% advance for COD
+      : subtotal;                    // 100% for prepaid
 
-    if (advanceAmount < 1) {
+    if (chargeAmount < 1) {
       return NextResponse.json({ error: "Order amount too small" }, { status: 400 });
     }
 
+    const paymentType = paymentMethod === "cod" ? "advance" : "full";
+    const description = paymentMethod === "cod"
+      ? `Advance (10%) — ₹${chargeAmount.toLocaleString("en-IN")}`
+      : `Full Payment — ₹${chargeAmount.toLocaleString("en-IN")}`;
+
     // 3. Create Razorpay order (amount in paise)
     const razorpayOrder = await razorpay.orders.create({
-      amount: advanceAmount * 100, // Convert to paise
+      amount: chargeAmount * 100, // Convert to paise
       currency: "INR",
       receipt: `nck_${user.id.slice(0, 8)}_${Date.now()}`,
       notes: {
         user_id: user.id,
         phone: user.phone_number,
         subtotal: subtotal.toString(),
-        advance: advanceAmount.toString(),
-        type: "advance_payment",
+        charge_amount: chargeAmount.toString(),
+        payment_method: paymentMethod,
+        payment_type: paymentType,
       },
     });
 
     return NextResponse.json({
       order_id: razorpayOrder.id,
-      amount: advanceAmount,
-      amount_paise: advanceAmount * 100,
+      amount: chargeAmount,
+      amount_paise: chargeAmount * 100,
       currency: "INR",
       key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      payment_method: paymentMethod,
+      payment_type: paymentType,
+      description,
+      subtotal,
       user: {
         name: user.name,
         phone: user.phone_number,

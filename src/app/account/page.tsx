@@ -84,7 +84,7 @@ export default function AccountPage() {
           </div>
         </div>
         <div className="mx-auto max-w-lg px-4 py-16 flex-1 flex flex-col items-center justify-center text-center">
-          <div className="h-20 w-20 bg-gradient-to-br from-gradient-start to-gradient-end rounded-full flex items-center justify-center mb-6 shadow-lg">
+          <div className="h-20 w-20 bg-primary rounded-full flex items-center justify-center mb-6 shadow-lg">
              <svg className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
              </svg>
@@ -95,7 +95,7 @@ export default function AccountPage() {
           </p>
           <Link
             href="/account/setup"
-            className="w-full rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+            className="w-full rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
           >
             Complete Your Profile
           </Link>
@@ -180,6 +180,48 @@ export default function AccountPage() {
               </div>
             </Link>
           </div>
+
+          {/* Admin Panel (Mobile Friendly) */}
+          {profile.is_admin && (
+            <section className="rounded-2xl border border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-5 sm:p-6">
+              <h3 className="text-sm font-bold text-amber-700 dark:text-amber-500 uppercase tracking-wider mb-4">Admin Panel</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Link
+                  href="/admin"
+                  className="rounded-xl border border-amber-200 dark:border-amber-800 bg-card-bg p-3 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md hover:border-amber-300 transition-all duration-200"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/40">
+                    <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Dashboard</span>
+                </Link>
+                <Link
+                  href="/admin/orders"
+                  className="rounded-xl border border-amber-200 dark:border-amber-800 bg-card-bg p-3 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md hover:border-amber-300 transition-all duration-200"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/40">
+                    <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Orders</span>
+                </Link>
+                <Link
+                  href="/admin/banners"
+                  className="rounded-xl border border-amber-200 dark:border-amber-800 bg-card-bg p-3 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md hover:border-amber-300 transition-all duration-200"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/40">
+                    <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Banners</span>
+                </Link>
+              </div>
+            </section>
+          )}
 
           {/* Business Details */}
           <section className="rounded-2xl border border-card-border bg-card-bg p-5 sm:p-6">

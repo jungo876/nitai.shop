@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimit, orderLimiter } from "@/lib/rate-limit";
+import { validateBody } from "@/lib/validations";
+import { addToCartSchema } from "@/lib/validations/cart";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +14,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
+    const blocked = await rateLimit(orderLimiter);
+    if (blocked) return blocked;
+
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {
@@ -101,6 +108,9 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    const blocked = await rateLimit(orderLimiter);
+    if (blocked) return blocked;
+
     const cookieStore = await cookies();
     const phone = cookieStore.get("nck_session")?.value;
     if (!phone) {
@@ -119,11 +129,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { product_id, variant_id, bulk_price_id, box_count } = body;
 
-    if (!product_id || !variant_id || !box_count) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
+    // Validate input
+    const v = validateBody(addToCartSchema, body);
+    if (v.error) return v.error;
+    const { product_id, variant_id, bulk_price_id, box_count } = v.data;
 
     // Check for existing duplicate
     let query = supabase
@@ -193,11 +203,15 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { item_id, quantity } = body;
 
-    if (!item_id || typeof quantity !== "number" || quantity < 1) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
+    // Validate input
+    const schema = z.object({
+      item_id: z.string().uuid("Invalid item ID"),
+      quantity: z.number().int().min(1, "Minimum quantity is 1"),
+    });
+    const v = validateBody(schema, body);
+    if (v.error) return v.error;
+    const { item_id, quantity } = v.data;
 
     const supabase = getSupabase();
 
@@ -232,11 +246,12 @@ export async function DELETE(request: Request) {
     }
 
     const body = await request.json();
-    const { item_id } = body;
 
-    if (!item_id) {
-      return NextResponse.json({ error: "item_id required" }, { status: 400 });
-    }
+    // Validate input
+    const schema = z.object({ item_id: z.string().uuid("Invalid item ID") });
+    const v = validateBody(schema, body);
+    if (v.error) return v.error;
+    const { item_id } = v.data;
 
     const supabase = getSupabase();
 
