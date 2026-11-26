@@ -13,7 +13,9 @@
     "test:watch": "vitest",
     "db:migrate": "node scripts/migrate.mjs",
     "db:status": "node scripts/migrate.mjs --status",
-    "db:backup": "node scripts/db-backup.mjs"
+    "db:backup": "node scripts/db-backup.mjs",
+    "test:e2e": "next build && playwright test",
+    "test:e2e:only": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",

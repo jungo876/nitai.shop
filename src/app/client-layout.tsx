@@ -17,7 +17,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = pathname.startsWith("/admin");
 
   // Pages where bottom nav should be hidden (checkout, cart, product detail, order detail)
-  const hideBottomNav = isAdmin || pathname === "/checkout" || pathname.startsWith("/orders/");
+  // Pages with their own fixed bottom action bar hide the tab bar so it cannot cover the button.
+  const hideBottomNav = isAdmin || pathname === "/cart" || pathname === "/checkout" || pathname.startsWith("/orders/");
 
   return (
     <LanguageProvider>

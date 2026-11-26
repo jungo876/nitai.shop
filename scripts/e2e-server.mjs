@@ -24,7 +24,8 @@ export const E2E = {
   adminPhone: "9000000001",
   keyId: "rzp_test_e2emockkey",
   keySecret: "e2e_mock_key_secret",
-  outbox: path.join(root, "test-results", "otp-outbox.jsonl"),
+  // not under test-results/: Playwright empties that folder at the start of a run
+  outbox: path.join(root, ".data", "e2e", "otp-outbox.jsonl"),
 };
 
 if (!existsSync(path.join(root, ".next", "BUILD_ID"))) {
@@ -54,7 +55,8 @@ const env = {
   APP_ENV: "test",
   PORT: String(E2E.appPort),
   DATABASE_URL: dbUrl,
-  DATABASE_POOL_MAX: "4",
+  // PGlite serves one query at a time; parallel connections interleave protocol messages.
+  DATABASE_POOL_MAX: "1",
   OTP_PROVIDER: "console",
   OTP_CONSOLE_OUTBOX: E2E.outbox,
   RAZORPAY_KEY_ID: E2E.keyId,

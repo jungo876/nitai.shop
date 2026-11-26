@@ -381,14 +381,6 @@ export default function AccountSetupPage() {
                 "Complete Setup ✓"
               )}
             </button>
-
-            <button
-              onClick={handleFinish}
-              disabled={saving}
-              className="w-full mt-3 text-center text-sm font-medium text-muted hover:text-foreground transition-colors py-2"
-            >
-              Skip address for now
-            </button>
           </div>
         )}
       </div>
