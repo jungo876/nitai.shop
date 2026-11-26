@@ -106,3 +106,14 @@ export async function requireAdmin(req: NextRequest): Promise<SessionUser> {
   if (!user.is_admin) throw forbidden();
   return user;
 }
+
+/**
+ * Housekeeping (run by the cron job): removes expired sessions and login codes
+ * older than a day. Codes from the last hour are kept because rate limits count them.
+ */
+export async function purgeExpiredAuthData() {
+  const sql = db();
+  const sessions = await sql`delete from sessions where expires_at < now()`;
+  const codes = await sql`delete from otp_challenges where created_at < now() - interval '1 day'`;
+  return { sessions: sessions.count, codes: codes.count };
+}

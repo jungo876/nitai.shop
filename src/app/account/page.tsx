@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useWishlist } from "@/context/WishlistContext";
+import { POLICY_LINKS } from "@/lib/policies";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -248,6 +249,20 @@ export default function AccountPage() {
             ) : (
               <p className="text-sm text-muted">No address provided.</p>
             )}
+          </section>
+
+          {/* Help & policies */}
+          <section className="rounded-2xl border border-card-border bg-card-bg p-5 sm:p-6">
+            <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-3">Help &amp; policies</h3>
+            <ul className="divide-y divide-card-border">
+              {POLICY_LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className="flex items-center justify-between py-2.5 text-sm font-medium text-foreground hover:text-primary">
+                    {l.label} <span aria-hidden="true" className="text-muted">›</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <button

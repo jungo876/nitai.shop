@@ -58,4 +58,21 @@ test.describe("guest browsing", () => {
     const res = await page.goto("/this-page-does-not-exist");
     expect(res?.status()).toBe(404);
   });
+
+  test("policy pages are reachable from the footer and show business details", async ({ page }) => {
+    const pages = [
+      ["Contact us", "Contact us"],
+      ["Terms & Conditions", "Terms & Conditions"],
+      ["Privacy Policy", "Privacy Policy"],
+      ["Cancellation & Refunds", "Cancellation & Refund Policy"],
+      ["Shipping & Delivery", "Shipping & Delivery Policy"],
+    ] as const;
+    for (const [link, heading] of pages) {
+      await page.goto("/");
+      await page.getByRole("contentinfo").getByRole("link", { name: link }).click();
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+      await expect(page.getByText("support@nitai.shop").first()).toBeVisible(); // from store settings
+    }
+    await expect(page.getByText("Howrah, West Bengal").first()).toBeVisible();
+  });
 });

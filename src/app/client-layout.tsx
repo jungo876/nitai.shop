@@ -16,9 +16,11 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
 
-  // Pages where bottom nav should be hidden (checkout, cart, product detail, order detail)
   // Pages with their own fixed bottom action bar hide the tab bar so it cannot cover the button.
   const hideBottomNav = isAdmin || pathname === "/cart" || pathname === "/checkout" || pathname.startsWith("/orders/");
+  // The same pages would hide the footer behind their action bar, so skip it there.
+  const showFooter = !hideBottomNav;
+  const bottomNavSpace = "pb-[calc(60px+env(safe-area-inset-bottom,0px))] md:pb-0";
 
   return (
     <LanguageProvider>
@@ -37,11 +39,11 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            <main className={`flex-1 ${!hideBottomNav ? "pb-[calc(60px+env(safe-area-inset-bottom,0px))] md:pb-0" : ""}`}>
-              {children}
-            </main>
+            <main className="flex-1">{children}</main>
 
-            {!isAdmin && <div className="hidden md:block"><Footer /></div>}
+            {showFooter && <Footer />}
+            {/* Room for the fixed mobile tab bar so it never covers content */}
+            {!hideBottomNav && <div aria-hidden="true" className={`md:hidden ${bottomNavSpace}`} />}
 
             {/* Mobile bottom navigation */}
             {!hideBottomNav && <BottomNav />}

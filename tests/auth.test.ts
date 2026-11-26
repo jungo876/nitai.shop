@@ -161,3 +161,20 @@ describe("session, profile and logout", () => {
     expect(after).toEqual({ user: null }); // old cookie is useless now
   });
 });
+
+describe("housekeeping", () => {
+  it("purges expired sessions and old login codes but keeps recent ones", async () => {
+    const u = await login(outbox);
+    await ctx.sql`insert into otp_challenges (phone_number, code_hash, provider, expires_at, created_at)
+                  values ('9811100000', 'x', 'console', now() - interval '2 days', now() - interval '2 days')`;
+    await ctx.sql`insert into sessions (user_id, token_hash, expires_at) values (${u.user.id}, 'old-session-hash', now() - interval '1 minute')`;
+    const { purgeExpiredAuthData } = await import("@/server/auth/session");
+    const r = await purgeExpiredAuthData();
+    expect(r.codes).toBeGreaterThanOrEqual(1);
+    expect(r.sessions).toBeGreaterThanOrEqual(1);
+    const [{ n }] = await ctx.sql`select count(*)::int as n from otp_challenges where phone_number = ${u.phone}`;
+    expect(n).toBeGreaterThan(0); // today's code is kept (rate limits count it)
+    const still = await body<{ user: { id: string } | null }>(await me.GET(makeReq("GET", "/api/auth/me", { cookie: u.cookie }), undefined));
+    expect(still.user?.id).toBe(u.user.id); // live session untouched
+  });
+});
