@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import type { Company, ProductWithVariants } from "@/lib/types";
 import ProductCard from "@/components/ProductCard";
-import HeroCarousel from "@/components/HeroCarousel";
+import TopSellingCard from "@/components/TopSellingCard";
+import PromoBannerCarousel from "@/components/PromoBannerCarousel";
 import { useLanguage } from "@/context/LanguageContext";
+import HomeCategoryNav from "@/components/HomeCategoryNav";
 import Link from "next/link";
 import Image from "next/image";
+import { IconPackage, IconTag, IconHandshake, IconStar } from "@/components/icons";
 
 export default function HomePage() {
   const { t } = useLanguage();
@@ -43,20 +46,18 @@ export default function HomePage() {
   }, [searchTerm]);
 
   useEffect(() => {
-    if (!debouncedSearch.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
+    // Results are only shown while there is a search term, so nothing to reset here.
+    if (!debouncedSearch.trim()) return;
 
     async function doSearch() {
       setIsSearching(true);
       try {
         const res = await fetch(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=10&offset=0`);
         const data = await res.json();
-        setSearchResults(data || []);
+        const results = Array.isArray(data) ? data : [];
+        setSearchResults(results);
         setSearchOffset(0);
-        setSearchHasMore(data?.length === 10);
+        setSearchHasMore(results.length === 10);
       } catch (err) {
         console.error("Search failed", err);
       } finally {
@@ -86,8 +87,9 @@ export default function HomePage() {
       try {
         const res = await fetch(`/api/products?limit=10&offset=0`);
         const data = await res.json();
-        setAllProducts(data || []);
-        if (!data || data.length < 10) setHasMore(false);
+        const products = Array.isArray(data) ? data : [];
+        setAllProducts(products);
+        if (products.length < 10) setHasMore(false);
       } catch (err) {
         console.error("Failed to fetch all products", err);
       } finally {
@@ -102,13 +104,15 @@ export default function HomePage() {
       try {
         let res = await fetch("/api/products?top_selling=true&limit=10");
         let data = await res.json();
+        let top = Array.isArray(data) ? data : [];
 
-        if (!data || data.length === 0) {
+        if (top.length === 0) {
           res = await fetch("/api/products?limit=5");
           data = await res.json();
+          top = Array.isArray(data) ? data : [];
         }
 
-        setTopProducts(data || []);
+        setTopProducts(top);
       } catch (err) {
         console.error("Failed to fetch top products", err);
       } finally {
@@ -124,10 +128,11 @@ export default function HomePage() {
     try {
       const res = await fetch(`/api/products?limit=10&offset=${nextOffset}`);
       const data = await res.json();
-      if (data && data.length > 0) {
-        setAllProducts(prev => [...prev, ...data]);
+      const more = Array.isArray(data) ? data : [];
+      if (more.length > 0) {
+        setAllProducts(prev => [...prev, ...more]);
         setOffset(nextOffset);
-        if (data.length < 10) setHasMore(false);
+        if (more.length < 10) setHasMore(false);
       } else {
         setHasMore(false);
       }
@@ -144,10 +149,11 @@ export default function HomePage() {
     try {
       const res = await fetch(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=10&offset=${nextOffset}`);
       const data = await res.json();
-      if (data && data.length > 0) {
-        setSearchResults(prev => [...prev, ...data]);
+      const moreResults = Array.isArray(data) ? data : [];
+      if (moreResults.length > 0) {
+        setSearchResults(prev => [...prev, ...moreResults]);
         setSearchOffset(nextOffset);
-        if (data.length < 10) setSearchHasMore(false);
+        if (moreResults.length < 10) setSearchHasMore(false);
       } else {
         setSearchHasMore(false);
       }
@@ -160,9 +166,10 @@ export default function HomePage() {
 
   return (
     <>
+      <h1 className="sr-only">NCK Agro — wholesale pesticides, fungicides, herbicides and fertilisers online</h1>
       {/* Sticky Floating Search Bar */}
       <div
-        className={`sticky z-50 px-3 sm:px-6 lg:px-8 transition-all duration-300 w-full ${isScrolled ? "top-9 py-9" : "top-3 py-3"}`}
+        className={`sticky z-40 px-3 sm:px-6 lg:px-8 transition-all duration-300 w-full ${isScrolled ? "top-[56px] md:top-[64px] py-2" : "top-[56px] md:top-[64px] py-3"}`}
       >
         <div
           className={`mx-auto max-w-2xl relative flex items-center backdrop-blur-md rounded-full h-[46px] px-4 sm:px-5 transition-all duration-300 ${isScrolled ? "bg-surface/90 shadow-md border border-card-border/50" : "bg-surface shadow-sm border border-card-border hover:shadow-md hover:border-primary/30"}`}
@@ -216,7 +223,7 @@ export default function HomePage() {
       {debouncedSearch.trim() ? (
         <section className="bg-background pt-6 pb-20 min-h-[50vh]">
           <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-            <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl mb-6">Search Results for "{debouncedSearch}"</h2>
+            <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl mb-6">Search results for &ldquo;{debouncedSearch}&rdquo;</h2>
 
             {isSearching ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
@@ -246,100 +253,92 @@ export default function HomePage() {
         </section>
       ) : (
         <>
-          <HeroCarousel />
-
-          <section className="border-y border-card-border bg-card-bg/50">
-            <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6 lg:px-8">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  { label: t("stat_products"), value: "50+", icon: "📦" },
-                  { label: t("stat_categories"), value: "8+", icon: "🏷️" },
-                  { label: t("stat_dealers"), value: "200+", icon: "🤝" },
-                  { label: t("stat_years"), value: "10+", icon: "⭐" },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex items-center gap-3 rounded-xl px-4 py-3">
-                    <span className="text-2xl">{stat.icon}</span>
-                    <div>
-                      <p className="text-lg font-bold text-foreground">{stat.value}</p>
-                      <p className="text-xs text-muted">{stat.label}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+          <HomeCategoryNav />
+          <PromoBannerCarousel />
 
           {/* Top Selling Section */}
-          <section className="bg-background pt-10 sm:pt-16">
+          <section className="pt-4 sm:pt-6">
+            {/* Green header bar */}
             <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl flex items-center gap-1.5">
-                  <span className="text-orange-500 text-xl">🔥</span> Top Selling
+              <div className="flex items-center justify-between rounded-t-xl bg-primary px-4 py-2.5">
+                <h2 className="text-sm font-bold text-white sm:text-base flex items-center gap-1.5">
+                  <span>🔥</span> Top Selling
                 </h2>
-                <span className="text-xs font-semibold text-primary cursor-pointer hover:underline">View All &rarr;</span>
+                <Link href="/products" className="text-xs font-semibold text-white/90 hover:text-white transition-colors">
+                  View All &rarr;
+                </Link>
               </div>
+            </div>
 
-              {loadingTop ? (
-                <div className="flex overflow-x-auto pb-4 gap-3 scrollbar-hide">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-56 w-[72vw] max-w-[280px] shrink-0 rounded-2xl bg-card-bg border border-card-border animate-shimmer" />
-                  ))}
-                </div>
-              ) : topProducts.length > 0 ? (
-                <div className="flex overflow-x-auto pb-6 gap-3 snap-x snap-mandatory scrollbar-hide px-1 sm:px-0">
-                  {topProducts.map((product, index) => (
-                    <div key={product.id} className="snap-center shrink-0 w-[72vw] max-w-[280px] sm:w-[280px]">
-                      <ProductCard product={product} index={index} />
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+            {/* Cards area — sits right below the green bar */}
+            <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+              <div className="rounded-b-xl bg-card-bg border border-card-border border-t-0 px-3 py-3">
+                {loadingTop ? (
+                  <div className="flex overflow-x-auto gap-3 scrollbar-hide">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="shrink-0 w-[160px] sm:w-[170px]">
+                        <div className="rounded-2xl bg-surface border border-card-border animate-shimmer">
+                          <div className="h-[120px] bg-surface rounded-t-2xl" />
+                          <div className="p-2.5 space-y-2">
+                            <div className="h-3 w-full bg-card-bg rounded" />
+                            <div className="h-3 w-2/3 bg-card-bg rounded" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : topProducts.length > 0 ? (
+                  <div className="flex overflow-x-auto gap-3 scrollbar-hide -mx-1 px-1">
+                    {topProducts.map((product) => (
+                      <TopSellingCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </section>
 
           {/* Companies Section */}
-          <section id="companies" className="scroll-mt-20">
-            <div className="mx-auto max-w-7xl px-3 py-10 sm:px-6 sm:py-16 lg:px-8">
-              <div className="mb-6 text-left">
-                <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-2xl">Browse by Company</h2>
-                <p className="mt-1 text-xs text-muted max-w-2xl sm:text-sm">Explore our trusted manufacturing partners and their complete catalog of agricultural products.</p>
+          <section id="companies" className="scroll-mt-20 bg-[#8b2382] pt-10 pb-8 sm:pt-14 sm:pb-12">
+            <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
+              <div className="mb-6 text-center">
+                <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest mb-1">Shop By</p>
+                <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-3xl">Popular Brands</h2>
               </div>
 
               {loading ? (
-                <div className="flex overflow-x-auto pb-4 gap-3 scrollbar-hide md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible md:pb-0">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="shrink-0 w-[140px] md:w-auto h-40 rounded-2xl animate-shimmer bg-card-bg border border-card-border" />
+                <div className="grid grid-rows-2 grid-flow-col gap-3 overflow-x-auto pb-4 scrollbar-hide px-1 sm:px-0">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                    <div key={i} className="shrink-0 w-[110px] h-[110px] sm:w-[130px] sm:h-[130px] rounded-[20px] animate-shimmer bg-white/20 border border-white/10" />
                   ))}
                 </div>
               ) : error ? (
-                <div className="text-center py-8 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30">
-                  <p className="text-danger font-medium">{error}</p>
+                <div className="text-center py-8 bg-white/10 rounded-2xl border border-white/20">
+                  <p className="text-white font-medium">{error}</p>
                 </div>
               ) : companies.length === 0 ? (
-                <div className="text-center py-12 bg-surface rounded-2xl border border-card-border border-dashed">
-                  <p className="text-muted font-medium">No companies available</p>
+                <div className="text-center py-12 bg-white/10 rounded-2xl border border-white/20 border-dashed">
+                  <p className="text-white/80 font-medium">No companies available</p>
                 </div>
               ) : (
-                <div className="flex overflow-x-auto pb-6 gap-3 snap-x snap-mandatory scrollbar-hide md:grid md:grid-cols-3 lg:grid-cols-4 md:overflow-visible md:pb-0 px-1 sm:px-0">
+                <div className="grid grid-rows-2 grid-flow-col gap-3 overflow-x-auto pb-4 scrollbar-hide px-1 sm:px-0 snap-x snap-mandatory">
                   {companies.map(c => (
-                    <Link key={c.id} href={`/company/${c.id}`} className="snap-center shrink-0 w-[140px] md:w-auto group flex flex-col items-center justify-center gap-3 rounded-2xl border border-card-border bg-card-bg p-4 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                      <div className="relative h-20 w-full max-w-[100px] flex items-center justify-center z-10">
-                        {c.logo_url ? (
-                          <img src={c.logo_url} alt={c.name} className="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-500 drop-shadow-sm" />
-                        ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface border border-card-border shadow-sm group-hover:scale-110 transition-transform duration-500">
-                            <span className="text-2xl font-bold text-muted group-hover:text-primary transition-colors">{c.name.charAt(0)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <span className="text-center font-bold text-foreground group-hover:text-primary transition-colors text-sm line-clamp-2 px-2 z-10">{c.name}</span>
+                    <Link key={c.id} href={`/company/${c.id}`} className="snap-center shrink-0 w-[110px] h-[110px] sm:w-[130px] sm:h-[130px] flex items-center justify-center rounded-[20px] bg-white p-4 shadow-sm transition-transform duration-300 hover:scale-[1.03] hover:shadow-xl active:scale-[0.98]">
+                      {c.logo_url ? (
+                        <img src={c.logo_url} alt={c.name} className="max-h-full max-w-full object-contain mix-blend-multiply" />
+                      ) : (
+                        <span className="text-2xl font-bold text-primary">{c.name.charAt(0)}</span>
+                      )}
                     </Link>
                   ))}
                 </div>
               )}
+
+              <div className="mt-4 text-center">
+                <Link href="/companies" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white transition-colors">
+                  Explore All <span aria-hidden="true">&rarr;</span>
+                </Link>
+              </div>
             </div>
           </section>
 
@@ -391,6 +390,22 @@ export default function HomePage() {
           </section>
         </>
       )}
+
+      {/* About — plain text that tells search engines and new visitors what we sell */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10 pt-4">
+        <div className="rounded-2xl border border-card-border bg-card-bg p-5 sm:p-6">
+          <h2 className="text-base font-bold text-foreground">Wholesale agro inputs for dealers, retailers and farmers</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            NCK Agro supplies genuine insecticides, fungicides, herbicides, plant growth regulators and fertilisers from
+            leading brands at wholesale prices. Choose a pack size, buy by the box for bulk discounts, and pay securely online
+            — or confirm with a small advance and pay the rest on delivery (Cash on Delivery). Track every order under My
+            Orders. Need help choosing a product for your crop? Contact us on WhatsApp.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted" lang="bn">
+            কীটনাশক, ছত্রাকনাশক, আগাছানাশক ও সার — পাইকারি দামে অনলাইনে অর্ডার করুন। বক্স হিসেবে কিনলে আরও কম দাম।
+          </p>
+        </div>
+      </section>
     </>
   );
 }

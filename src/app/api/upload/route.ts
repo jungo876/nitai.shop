@@ -1,66 +1,22 @@
-import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { badRequest, json, route } from "@/server/http";
+import { requireAdmin } from "@/server/auth/session";
+import { enforceRateLimit } from "@/server/rate-limit";
+import { MAX_UPLOAD_BYTES, uploadImage } from "@/server/storage";
+import { logAdminAction } from "@/server/audit";
 
-export const dynamic = "force-dynamic";
-
-export async function POST(request: Request) {
-  try {
-    const supabase = getSupabase();
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF" },
-        { status: 400 }
-      );
-    }
-
-    // Max 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File too large. Max size: 5MB" },
-        { status: 400 }
-      );
-    }
-
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-    const filePath = `products/${fileName}`;
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    const { error: uploadError } = await supabase.storage
-      .from("product-images")
-      .upload(filePath, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      return NextResponse.json(
-        { error: "Failed to upload image" },
-        { status: 500 }
-      );
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("product-images")
-      .getPublicUrl(filePath);
-
-    return NextResponse.json({ url: urlData.publicUrl });
-  } catch (err) {
-    console.error("Upload error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+/** POST /api/upload (multipart: file, folder=products|brands|banners) -> { url } — admin only */
+export const POST = route(async (req) => {
+  const admin = await requireAdmin(req);
+  await enforceRateLimit("write", admin.id);
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_UPLOAD_BYTES + 64 * 1024) {
+    throw badRequest("Image is too large (maximum 5 MB).");
   }
-}
+  const form = await req.formData();
+  const file = form.get("file");
+  if (!(file instanceof File)) throw badRequest("No file provided.");
+  const folderRaw = String(form.get("folder") ?? "products");
+  const folder = (["products", "brands", "banners"] as const).find((f) => f === folderRaw) ?? "products";
+  const url = await uploadImage(file, folder);
+  await logAdminAction(admin.id, "Image Uploaded", "Storage", null, { folder, size: file.size });
+  return json({ url }, { status: 201 });
+});

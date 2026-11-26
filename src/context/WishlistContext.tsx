@@ -53,8 +53,19 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   }, [isLoggedIn]);
 
   useEffect(() => {
-    refreshWishlist();
-  }, [refreshWishlist]);
+    let active = true;
+    if (!isLoggedIn) {
+      Promise.resolve().then(() => active && setWishlistedIds(new Set()));
+    } else {
+      fetch("/api/wishlist?ids_only=true")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => active && d && setWishlistedIds(new Set(d.product_ids || [])))
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [isLoggedIn]);
 
   const isWishlisted = useCallback(
     (productId: string) => wishlistedIds.has(productId),

@@ -2,18 +2,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
+  --background: #faf9f6; /* Warm off-white */
+  --foreground: #1c1917; /* Warm dark gray */
+  --card-bg: #ffffff; /* Pure white */
+  --card-border: #e7e5e4; /* Warm light gray border */
   --primary: #16a34a;
   --primary-hover: #15803d;
   --primary-light: #dcfce7;
   --secondary: #0d9488;
   --accent: #f59e0b;
-  --muted: #64748b;
+  --muted: #78716c; /* Warm muted text */
   --danger: #ef4444;
-  --surface: #f1f5f9;
+  --surface: #f5f5f0; /* Warm subtle surface */
   --whatsapp: #25D366;
   --whatsapp-hover: #1ebe57;
   --gradient-start: #16a34a;
@@ -40,17 +40,7 @@
   --font-sans: "Inter", system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #020617;
-    --foreground: #e2e8f0;
-    --card-bg: #0f172a;
-    --card-border: #1e293b;
-    --primary-light: #052e16;
-    --surface: #0f172a;
-    --muted: #94a3b8;
-  }
-}
+/* Dark mode removed per user request for pure/warm white theme */
 
 * {
   box-sizing: border-box;
@@ -117,8 +107,17 @@ body {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, var(--surface) 25%, var(--card-border) 50%, var(--surface) 75%);
-  background-size: 200% 100%;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
   animation: shimmer 1.5s infinite;
 }
 
@@ -194,8 +193,8 @@ body {
 .total-price-section {
   margin-bottom: 0.5rem; padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
-  background: linear-gradient(135deg, var(--primary-light), color-mix(in srgb, var(--primary-light) 60%, var(--surface)));
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  background: var(--surface);
+  border: 1px solid var(--card-border);
 }
 .total-price-row {
   display: flex; align-items: baseline; justify-content: space-between;

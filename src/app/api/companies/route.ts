@@ -1,49 +1,18 @@
-import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { json, readJson, route } from "@/server/http";
+import { requireAdmin } from "@/server/auth/session";
+import { listCompanies } from "@/server/catalog";
+import { createCompany } from "@/server/admin/products";
+import { logAdminAction } from "@/server/audit";
+import { companySchema } from "@/lib/validations/product";
 
-export const dynamic = "force-dynamic";
+/** GET /api/companies -> all brands (with visible product counts) */
+export const GET = route(async () => json(await listCompanies()));
 
-export async function GET() {
-  try {
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("companies")
-      .select("*")
-      .order("name", { ascending: true });
-
-    if (error) {
-      console.error("Companies GET error:", error);
-      return NextResponse.json({ error: "Failed to fetch companies" }, { status: 500 });
-    }
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("Unexpected error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const supabase = getSupabase();
-    const { name, logo_url } = await request.json();
-
-    if (!name) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
-    }
-
-    const { data, error } = await supabase
-      .from("companies")
-      .insert([{ name, logo_url: logo_url || "" }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Companies POST error:", error);
-      return NextResponse.json({ error: error.message.includes("duplicate") ? "Company already exists" : "Failed to create company" }, { status: 500 });
-    }
-    return NextResponse.json(data, { status: 201 });
-  } catch (err) {
-    console.error("Unexpected error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
+/** POST /api/companies (admin) */
+export const POST = route(async (req) => {
+  const admin = await requireAdmin(req);
+  const input = await readJson(req, companySchema);
+  const company = await createCompany(input);
+  await logAdminAction(admin.id, "Company Created", "Company", company.id, { name: company.name });
+  return json(company, { status: 201 });
+});

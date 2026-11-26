@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated test output and local data
+    "test-results/**",
+    "playwright-report/**",
+    ".data/**",
+    // One-off maintenance script (not part of the app)
+    "replace_gradients.js",
   ]),
 ]);
 

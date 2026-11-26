@@ -1,68 +1,56 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getSupabase } from "@/lib/supabase";
+import { z } from "zod";
+import { json, parseOrThrow, readJson, route } from "@/server/http";
+import { requireAdmin } from "@/server/auth/session";
+import { enforceRateLimit } from "@/server/rate-limit";
+import { getAdminOrderCounts, listAdminOrders, markOrdersSeen, updateAdminOrder } from "@/server/admin/orders";
+import { logAdminAction } from "@/server/audit";
+import { adminUpdateOrderSchema } from "@/lib/validations/order";
+import { ORDER_STATUSES, PAYMENT_STATUSES } from "@/lib/order-status";
 
-export const dynamic = "force-dynamic";
+const querySchema = z.object({
+  status: z.enum(ORDER_STATUSES).optional(),
+  payment: z.enum(PAYMENT_STATUSES).optional(),
+  search: z.string().trim().max(100).optional(),
+  unseen: z.enum(["true", "false"]).optional(),
+  abandoned: z.enum(["true", "false"]).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "nckadmin123";
+/** GET /api/admin/orders?status=&payment=&search=&unseen=true&limit=&offset= */
+export const GET = route(async (req) => {
+  const admin = await requireAdmin(req);
+  await enforceRateLimit("admin", admin.id);
+  const q = parseOrThrow(querySchema, Object.fromEntries(req.nextUrl.searchParams));
+  const [result, counts] = await Promise.all([
+    listAdminOrders({
+      status: q.status, payment: q.payment, search: q.search, unseenOnly: q.unseen === "true",
+      includeAbandoned: q.abandoned === "true", limit: q.limit, offset: q.offset,
+    }),
+    getAdminOrderCounts(),
+  ]);
+  return json({ ...result, counts });
+});
 
-async function isAdmin() {
-  const c = await cookies();
-  return c.get("nck_admin")?.value === ADMIN_PASSWORD;
-}
+/** PATCH /api/admin/orders { order_id, order_status?, payment_status?, remaining_payment_method?, admin_notes? } */
+export const PATCH = route(async (req) => {
+  const admin = await requireAdmin(req);
+  await enforceRateLimit("admin", admin.id);
+  const input = await readJson(req, adminUpdateOrderSchema);
+  const { before, after } = await updateAdminOrder(input);
+  await logAdminAction(admin.id, "Order Updated", "Order", input.order_id, {
+    from: { order_status: before.order_status, payment_status: before.payment_status },
+    to: { order_status: after.order_status, payment_status: after.payment_status },
+  });
+  return json({ success: true, order: after });
+});
 
-/** GET /api/admin/orders — fetch all orders with user/business/address */
-export async function GET() {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const seenSchema = z.object({ ids: z.array(z.uuid()).max(500).optional(), all: z.boolean().optional() });
 
-  const supabase = getSupabase();
-  const { data: orders, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error || !orders) return NextResponse.json({ orders: [] });
-
-  // Enrich with user + business + address + items
-  const enriched = [];
-  for (const o of orders) {
-    const { data: user } = await supabase.from("users").select("name, phone_number, whatsapp_number").eq("id", o.user_id).single();
-    const { data: bp } = await supabase.from("business_profiles").select("shop_name, gst_number, pan_number").eq("user_id", o.user_id).single();
-    const { data: addr } = await supabase.from("addresses").select("address_line, landmark, city, state, pincode, phone_number").eq("user_id", o.user_id).eq("is_default", true).single();
-    const { data: items } = await supabase.from("order_items").select("*").eq("order_id", o.id);
-
-    enriched.push({
-      ...o,
-      customer_name: user?.name || "N/A",
-      customer_phone: user?.phone_number || "",
-      customer_whatsapp: user?.whatsapp_number || "",
-      shop_name: bp?.shop_name || "",
-      gst_number: bp?.gst_number || "",
-      pan_number: bp?.pan_number || "",
-      address: addr || null,
-      items: items || [],
-    });
-  }
-
-  return NextResponse.json({ orders: enriched });
-}
-
-/** PATCH /api/admin/orders — update order/payment status */
-export async function PATCH(request: Request) {
-  if (!(await isAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { order_id, order_status, payment_status } = await request.json();
-  if (!order_id) return NextResponse.json({ error: "order_id required" }, { status: 400 });
-
-  const supabase = getSupabase();
-  const updates: Record<string, string> = {};
-  if (order_status) updates.order_status = order_status;
-  if (payment_status) updates.payment_status = payment_status;
-
-  if (Object.keys(updates).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
-
-  const { error } = await supabase.from("orders").update(updates).eq("id", order_id);
-  if (error) return NextResponse.json({ error: "Update failed" }, { status: 500 });
-
-  return NextResponse.json({ success: true });
-}
+/** POST /api/admin/orders { ids: [...] } or { all: true } -> marks orders as seen (clears the "new" badge). */
+export const POST = route(async (req) => {
+  await requireAdmin(req);
+  const { ids, all } = await readJson(req, seenSchema);
+  const updated = await markOrdersSeen(all ? "all" : ids ?? []);
+  return json({ success: true, updated });
+});

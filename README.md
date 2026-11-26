@@ -1,105 +1,99 @@
-# NCK Agro — B2B Pesticide Distribution Platform
+# NCK Agro — B2B agro-inputs store (www.nitai.shop)
 
-A Next.js 14 B2B platform for agricultural product distribution with admin panel, company management, bulk pricing, and product discovery features.
+Online ordering for pesticides, fungicides, herbicides and fertilisers for retailers,
+dealers and farmers: catalogue with pack sizes and box (bulk) pricing, OTP login,
+cart, Razorpay payments (prepaid or Cash on Delivery with an online advance), order
+tracking, and an admin panel for products, brands, banners, orders, customers,
+analytics and store settings.
 
----
+**Going live?** Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Current state and plan: [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
-## 🚀 Getting Started
+## Tech stack
 
-### 1. Clone the repo
+- Next.js 16 (App Router; see `AGENTS.md` — APIs differ from older versions), React 19, Tailwind 4, TypeScript
+- PostgreSQL on Supabase, accessed **only from the server** (`postgres` driver); Row Level Security blocks direct browser access
+- Supabase Storage for images (uploaded through the server)
+- Razorpay (REST API) — server-side pricing, signature + payment verification, webhook
+- OTP login by SMS (MSG91 or Twilio Verify; `console` in development), httpOnly session cookie
+- Vitest + PGlite (in-memory Postgres) for API tests; Playwright for browser tests
 
-```bash
-git clone https://github.com/jungo876/nitai.shop.git
-cd nitai.shop
-```
-
-### 2. Install dependencies
+## Getting started (development)
 
 ```bash
 npm install
+cp .env.example .env.local      # then fill in values (see comments in the file)
+npm run check-env               # shows which settings are present (never prints values)
+npm run dev                     # http://localhost:3000
 ```
 
-### 3. Set up environment variables
+With `OTP_PROVIDER=console` the 6-digit login code is printed in the terminal.
+Make yourself an admin with `npm run admin:grant -- <your mobile>`, log in, open `/admin`.
 
-Create a `.env.local` file in the root directory (get values from the project owner):
+> `npm run dev` uses the database in `DATABASE_URL` — usually the **real** one.
+> To try things safely use the sandbox below.
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-ADMIN_PASSWORD=your_admin_password
-NEXT_PUBLIC_WHATSAPP_NUMBER=your_whatsapp_number
-```
-
-### 4. Set up the database
-
-Run the SQL files in your Supabase SQL editor **in this order**:
-
-1. `supabase/setup.sql` — Creates all base tables (`companies`, `products`, `product_variants`, `bulk_prices`)
-2. `supabase/migration_bulk_prices.sql` — Adds bulk pricing support + `is_top_selling` column
-
-### 5. Run the dev server
+### Sandbox (safe playground)
 
 ```bash
-npm run dev
+npm run sandbox                 # http://localhost:3100
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+A private copy of the shop with demo products and an in-memory database that is thrown
+away when you stop it. Payments use your Razorpay **test** keys from `.env.local`
+(UPI `success@razorpay` or Razorpay test cards; live keys are refused). Admin login:
+`9000000001`; codes appear in the terminal.
 
-Admin panel: [http://localhost:3000/admin](http://localhost:3000/admin)
+## Scripts
 
----
+| Command | What it does |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js development server / production build / run the build |
+| `npm run lint` / `typecheck` | ESLint / TypeScript |
+| `npm test` | API and database tests (in-memory Postgres, fake Razorpay) |
+| `npm run test:e2e` | Build, then browser tests (mobile + desktop) against an isolated copy |
+| `npm run sandbox` | Safe playground (see above) |
+| `npm run check-env` (`-- --prod`) | Which variables are set; production rules with `--prod` |
+| `npm run db:status` / `db:migrate` | Show / apply database migrations (`supabase/migrations`) |
+| `npm run db:backup` | Full database backup into `backups/` |
+| `npm run admin:list` / `admin:grant -- <phone>` / `admin:revoke -- <phone>` | Manage admin access |
+| `npm run storage:smoke` | Upload/delete a test image in the real storage bucket |
 
-## 🏗️ Project Structure
+On Windows, run the tests from a normal terminal (PowerShell or cmd). Vitest can fail
+to start in shells that report the drive letter in lower case.
+
+## Project structure
 
 ```
 src/
-├── app/
-│   ├── admin/          # Admin panel (company + product management)
-│   ├── api/
-│   │   ├── companies/  # CRUD for companies
-│   │   ├── products/   # CRUD for products (search, pagination, top_selling filter)
-│   │   └── upload/     # Image upload endpoint
-│   ├── company/[id]/   # Dynamic company product page
-│   └── page.tsx        # Homepage (search, top selling, companies, all products)
-├── components/
-│   ├── BulkPricingSelector.tsx
-│   ├── HeroCarousel.tsx
-│   └── ProductCard.tsx
-└── lib/
-    ├── supabase.ts
-    └── types.ts
+  app/                 pages (storefront, /admin, policy pages) and API routes (app/api/**)
+  components/          UI components
+  context/             client state: auth, cart, wishlist, store settings, language
+  lib/                 code shared by browser and server: validation (zod), money, phone, statuses
+  server/              server-only code: env, db, auth (OTP, sessions), orders, payments,
+                       catalog, cart, storage, admin queries, rate limits, logging
+  instrumentation.ts   refuses to start in production with missing/unsafe settings
+supabase/migrations/   versioned SQL migrations (applied by npm run db:migrate)
+scripts/               env check, migrations, backup, admin, sandbox/E2E server, storage check
+tests/                 Vitest API tests; tests/e2e = Playwright browser tests
+docs/DEPLOYMENT.md     how to deploy, check and roll back
 ```
 
----
+## How key things work
 
-## ✨ Features
+- **Prices are always calculated on the server.** The browser sends product, pack and box
+  choice; the server computes the amount (in paise) and creates the Razorpay order.
+- **An order is placed only after payment is verified**: signature check *and* fetching the
+  payment from Razorpay (amount, currency, status). The webhook confirms payments if the
+  customer's browser closes; checkouts not paid within 30 minutes are cancelled by the cron job.
+- **Login**: one-time code by SMS, stored hashed, 5 attempts, rate limited per phone and per IP.
+  Sessions are random tokens in an httpOnly cookie; only their hash is stored.
+- **Admin** pages and APIs require `users.is_admin`; every admin change is logged (shown under Admin → Settings).
+- **Security**: CSRF origin checks on all state-changing requests, Content-Security-Policy and
+  other security headers, request-size limits, generic error messages with a reference id.
 
-- **Homepage**: Hero carousel, sticky search bar, Top Selling section, Browse by Company, All Products with pagination
-- **Company Pages**: `/company/[id]` — shows all products for a company
-- **Admin Panel**: Sticky navbar with search, company management (logo upload), product management (variants, bulk pricing, top selling toggle)
-- **Search**: API supports `?search=keyword` with name, category, and company name filtering
-- **Pagination**: `?limit=10&offset=0` with "See More" append loading
+## Database changes
 
----
-
-## 🔑 Key API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/products` | List products (supports `?search=`, `?top_selling=true`, `?limit=`, `?offset=`, `?company_id=`) |
-| POST | `/api/products` | Create product |
-| PUT | `/api/products/[id]` | Update product |
-| DELETE | `/api/products/[id]` | Delete product |
-| GET | `/api/companies` | List all companies |
-| POST | `/api/companies` | Create company |
-| DELETE | `/api/companies/[id]` | Delete company |
-| POST | `/api/upload` | Upload image → Supabase Storage |
-
----
-
-## 🛠️ Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Database**: Supabase (PostgreSQL)
-- **Styling**: Tailwind CSS
-- **Language**: TypeScript
+Add a new file `supabase/migrations/YYYYMMDDHHMMSS_description.sql`, run `npm test`
+(the migration tests apply every file to a fresh database), back up, then `npm run db:migrate`.
+Never edit a migration that is already applied — the checksum check will refuse it.

@@ -6,23 +6,48 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check-env": "node scripts/check-env.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:status": "node scripts/migrate.mjs --status",
+    "db:backup": "node scripts/db-backup.mjs",
+    "test:e2e": "next build && playwright test",
+    "test:e2e:only": "playwright test",
+    "storage:smoke": "node scripts/storage-smoke.mjs",
+    "admin:list": "node scripts/admin.mjs list",
+    "admin:grant": "node scripts/admin.mjs grant",
+    "admin:revoke": "node scripts/admin.mjs revoke",
+    "sandbox": "next build && node scripts/e2e-server.mjs --sandbox",
+    "samples:add": "node scripts/sample-products.mjs add",
+    "samples:hide": "node scripts/sample-products.mjs hide"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.1",
-    "next": "16.2.4",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
+    "next": "^16.4.6",
+    "postgres": "^4.1.1",
     "razorpay": "^2.9.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "^19.2.9",
+    "react-dom": "^19.2.9",
+    "recharts": "^3.8.1",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.6.0",
+    "@electric-sql/pglite-socket": "^0.3.0",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "eslint-config-next": "^16.4.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.12"
   }
 }

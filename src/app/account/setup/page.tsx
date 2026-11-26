@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, type Profile } from "@/context/AuthContext";
+import { api, safeReturnUrl } from "@/lib/api-client";
 
 type Step = 1 | 2 | 3;
 
@@ -28,12 +29,14 @@ export default function AccountSetupPage() {
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
 
-  // Redirect if not logged in
+  // Not logged in: go home and open the login sheet.
+  const { requireAuth } = useAuth();
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
+      requireAuth({ type: "account", returnUrl: "/account/setup" });
       router.replace("/");
     }
-  }, [isLoading, isLoggedIn, router]);
+  }, [isLoading, isLoggedIn, router, requireAuth]);
 
   // Fetch and pre-fill existing data
   useEffect(() => {
@@ -73,57 +76,42 @@ export default function AccountSetupPage() {
 
   async function handleFinish() {
     if (!user) return;
-
     if (!name.trim() || !shopName.trim()) {
       setError("Name and shop name are required.");
+      setStep(!name.trim() ? 1 : 2);
       return;
     }
-
     setSaving(true);
     setError("");
-
-    try {
-      const res = await fetch("/api/auth/setup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user.id,
-          name: name.trim(),
-          whatsapp_number: whatsapp.trim(),
-          shop_name: shopName.trim(),
-          gst_number: gstNumber.trim() || null,
-          pan_number: panNumber.trim() || null,
-          business_type: businessType.trim() || null,
-          address_line: addressLine.trim() || null,
-          landmark: landmark.trim() || null,
-          city: city.trim() || null,
-          state: state.trim() || null,
-          pincode: pincode.trim() || null,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Setup failed");
-      }
-
-      const data = await res.json();
-      if (data.user) {
-        setUser(data.user);
-      }
-
-      // Resume pending action
-      if (pendingAction?.returnUrl) {
-        clearPendingAction();
-        router.push(pendingAction.returnUrl);
-      } else {
-        router.push("/account");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setSaving(false);
+    const r = await api<{ user: Profile }>("/api/auth/setup", {
+      body: {
+        name: name.trim(),
+        whatsapp_number: whatsapp.trim(),
+        shop_name: shopName.trim(),
+        gst_number: gstNumber.trim(),
+        pan_number: panNumber.trim(),
+        business_type: businessType.trim(),
+        address_line: addressLine.trim(),
+        landmark: landmark.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        pincode: pincode.trim(),
+      },
+    });
+    setSaving(false);
+    if (!r.ok || !r.data) {
+      setError(r.error ?? "Could not save your details.");
+      // Jump to the step that contains the first problem.
+      const field = r.details?.[0]?.field ?? "";
+      if (["name", "whatsapp_number"].includes(field)) setStep(1);
+      else if (["shop_name", "gst_number", "pan_number", "business_type"].includes(field)) setStep(2);
+      else if (field) setStep(3);
+      return;
     }
+    setUser(r.data.user);
+    const next = new URLSearchParams(window.location.search).get("next") ?? pendingAction?.returnUrl;
+    clearPendingAction();
+    router.push(safeReturnUrl(next, "/account"));
   }
 
   const ic = "w-full rounded-xl border border-card-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted/50 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all";
@@ -161,7 +149,7 @@ export default function AccountSetupPage() {
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                s <= step ? "bg-gradient-to-r from-gradient-start to-gradient-end" : "bg-surface"
+                s <= step ? "bg-primary" : "bg-surface"
               }`}
             />
           ))}
@@ -224,7 +212,7 @@ export default function AccountSetupPage() {
                 setError("");
                 setStep(2);
               }}
-              className="w-full mt-6 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+              className="w-full mt-6 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
             >
               Continue
             </button>
@@ -310,7 +298,7 @@ export default function AccountSetupPage() {
                 setError("");
                 setStep(3);
               }}
-              className="w-full mt-6 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+              className="w-full mt-6 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200"
             >
               Continue
             </button>
@@ -379,7 +367,7 @@ export default function AccountSetupPage() {
             <button
               onClick={handleFinish}
               disabled={saving}
-              className="w-full mt-6 rounded-xl bg-gradient-to-r from-gradient-start to-gradient-end px-6 py-3.5 text-base font-bold text-white shadow-lg disabled:opacity-50 hover:shadow-xl active:scale-[0.98] transition-all duration-200"
+              className="w-full mt-6 rounded-xl bg-primary px-6 py-3.5 text-base font-bold text-white shadow-lg disabled:opacity-50 hover:shadow-xl active:scale-[0.98] transition-all duration-200"
             >
               {saving ? (
                 <span className="flex items-center justify-center gap-2">
@@ -392,14 +380,6 @@ export default function AccountSetupPage() {
               ) : (
                 "Complete Setup ✓"
               )}
-            </button>
-
-            <button
-              onClick={handleFinish}
-              disabled={saving}
-              className="w-full mt-3 text-center text-sm font-medium text-muted hover:text-foreground transition-colors py-2"
-            >
-              Skip address for now
             </button>
           </div>
         )}
