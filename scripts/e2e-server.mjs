@@ -5,7 +5,12 @@
  *   - a fake Razorpay API
  *   - the PRODUCTION build (`next start`) pointed at both
  * Nothing touches the real database or Razorpay. Requires `next build` first.
+ *
+ * With --sandbox (npm run sandbox) it is a private playground for the owner:
+ * payments use your Razorpay TEST keys from .env.local (real test checkout, no
+ * real money; live keys are refused). Login codes are printed in this terminal.
  */
+import nextEnv from "@next/env";
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import postgres from "postgres";
@@ -47,7 +52,20 @@ await applyMigrations(sql, { dir: path.join(root, "supabase", "migrations") });
 await seedDemoData(sql, { adminPhone: E2E.adminPhone });
 await sql.end();
 
-await startRazorpayMock({ port: E2E.rzpPort, keyId: E2E.keyId, keySecret: E2E.keySecret });
+const sandbox = process.argv.includes("--sandbox");
+let razorpay = { RAZORPAY_KEY_ID: E2E.keyId, RAZORPAY_KEY_SECRET: E2E.keySecret, RAZORPAY_API_BASE: `http://127.0.0.1:${E2E.rzpPort}` };
+if (sandbox) {
+  // Read only the Razorpay keys from .env.local; everything else stays isolated.
+  const { combinedEnv } = nextEnv.loadEnvConfig(root, true, { info: () => {}, error: console.error });
+  const id = combinedEnv.RAZORPAY_KEY_ID ?? "";
+  if (!id.startsWith("rzp_test_") || !combinedEnv.RAZORPAY_KEY_SECRET) {
+    console.error("Sandbox needs Razorpay TEST keys (rzp_test_…) in .env.local. Live keys are never used here.");
+    process.exit(1);
+  }
+  razorpay = { RAZORPAY_KEY_ID: id, RAZORPAY_KEY_SECRET: combinedEnv.RAZORPAY_KEY_SECRET, RAZORPAY_API_BASE: "https://api.razorpay.com" };
+} else {
+  await startRazorpayMock({ port: E2E.rzpPort, keyId: E2E.keyId, keySecret: E2E.keySecret });
+}
 
 const env = {
   ...process.env,
@@ -59,10 +77,8 @@ const env = {
   DATABASE_POOL_MAX: "1",
   OTP_PROVIDER: "console",
   OTP_CONSOLE_OUTBOX: E2E.outbox,
-  RAZORPAY_KEY_ID: E2E.keyId,
-  RAZORPAY_KEY_SECRET: E2E.keySecret,
+  ...razorpay,
   RAZORPAY_WEBHOOK_SECRET: "e2e_webhook_secret",
-  RAZORPAY_API_BASE: `http://127.0.0.1:${E2E.rzpPort}`,
   SESSION_SECRET: "e2e-session-secret-0123456789abcdef0123456789",
   CRON_SECRET: "e2e-cron-secret-0123456789",
   // keep real third-party services out of tests
@@ -74,6 +90,18 @@ const env = {
   SUPABASE_SERVICE_ROLE_KEY: "",
   APP_URL: `http://localhost:${E2E.appPort}`,
 };
+
+if (sandbox) {
+  console.log(`
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ NCK Agro SANDBOX — demo data, nothing real is touched                 │
+  │ Open      http://localhost:${E2E.appPort}                                    │
+  │ Admin     log in with ${E2E.adminPhone} (any number works as a customer)  │
+  │ Codes     the 6-digit login code is printed below as [DEV OTP]        │
+  │ Payments  Razorpay TEST mode: UPI id success@razorpay, or test cards  │
+  │ Stop      Ctrl+C (all sandbox data is thrown away)                    │
+  └──────────────────────────────────────────────────────────────────────┘`);
+}
 
 const child = spawn(process.execPath, [path.join(root, "node_modules", "next", "dist", "bin", "next"), "start", "-p", String(E2E.appPort)], {
   cwd: root,

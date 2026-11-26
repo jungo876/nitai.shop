@@ -16,7 +16,11 @@
     "db:backup": "node scripts/db-backup.mjs",
     "test:e2e": "next build && playwright test",
     "test:e2e:only": "playwright test",
-    "storage:smoke": "node scripts/storage-smoke.mjs"
+    "storage:smoke": "node scripts/storage-smoke.mjs",
+    "admin:list": "node scripts/admin.mjs list",
+    "admin:grant": "node scripts/admin.mjs grant",
+    "admin:revoke": "node scripts/admin.mjs revoke",
+    "sandbox": "next build && node scripts/e2e-server.mjs --sandbox"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.0.8",

@@ -17,7 +17,7 @@ export async function startTestDb() {
       if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
     end $$;
   `);
-  const server = new PGLiteSocketServer({ db: pg, port: 0, host: "127.0.0.1" });
+  const server = new PGLiteSocketServer({ db: pg, port: 0, host: "127.0.0.1", maxConnections: 4 }); // app pool + scripts run by tests
   await server.start();
   const url = `postgres://postgres:postgres@${server.getServerConn()}/postgres`;
   return {

@@ -60,5 +60,19 @@ if (prod && process.env.OTP_PROVIDER === "console") {
   missing++;
 }
 
+// Safe database metadata: connection type, port and region — never user or password.
+if (isSet("DATABASE_URL")) {
+  try {
+    const u = new URL(process.env.DATABASE_URL);
+    const pooler = u.hostname.endsWith(".pooler.supabase.com");
+    const region = pooler ? (u.hostname.match(/^aws-\d+-([a-z0-9-]+)\.pooler/)?.[1] ?? "unknown") : "n/a";
+    const kind = pooler ? (u.port === "6543" ? "Supabase transaction pooler (good for Vercel)" : `Supabase session pooler (port ${u.port || "5432"}; use 6543 on Vercel)`) : u.hostname.endsWith(".supabase.co") ? "Supabase DIRECT connection (use the transaction pooler on Vercel)" : "non-Supabase host";
+    console.log(`Database: ${kind}; region: ${region}`);
+  } catch {
+    console.log("Database: DATABASE_URL is not a valid URL");
+    missing++;
+  }
+}
+
 console.log(missing ? `\n${missing} problem(s) found.` : "\nAll required variables are set.");
 process.exit(missing ? 1 : 0);

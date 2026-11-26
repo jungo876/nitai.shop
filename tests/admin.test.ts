@@ -158,3 +158,31 @@ describe("uploads", () => {
     expect((await body(res)).error).toMatch(/JPEG, PNG, WebP or GIF/);
   });
 });
+
+describe("admin access script (npm run admin:grant / admin:revoke)", () => {
+  const run = async (...args: string[]) => {
+    const { execFile } = await import("node:child_process");
+    // DATABASE_URL is passed explicitly so the script can only ever reach the test database.
+    return new Promise<{ code: number; out: string }>((resolve) =>
+      execFile(process.execPath, ["scripts/admin.mjs", ...args], { env: { ...process.env, DATABASE_URL: ctx.url } }, (err, stdout, stderr) =>
+        resolve({ code: err ? 1 : 0, out: stdout + stderr })
+      )
+    );
+  };
+
+  it("grants and revokes admin access and ends that user's sessions", async () => {
+    const u = await login(outbox);
+    const granted = await run("grant", `+91 ${u.phone}`);
+    expect(granted.code, granted.out).toBe(0);
+    expect(granted.out).not.toContain(u.phone); // number is masked in output
+    const [a] = await ctx.sql`select is_admin from users where id = ${u.user.id}`;
+    expect(a.is_admin).toBe(true);
+    const [{ n }] = await ctx.sql`select count(*)::int as n from sessions where user_id = ${u.user.id}`;
+    expect(n).toBe(0); // must log in again to pick up the role
+
+    expect((await run("revoke", u.phone)).code).toBe(0);
+    const [b] = await ctx.sql`select is_admin from users where id = ${u.user.id}`;
+    expect(b.is_admin).toBe(false);
+    expect((await run("grant", "12345")).code).toBe(1);
+  });
+});

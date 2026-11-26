@@ -1,7 +1,7 @@
 /**
  * Demo catalogue for local development and end-to-end tests.
  * Idempotent: re-running does not duplicate brands/products.
- * NEVER run against the production database (seed.mjs refuses unless --force).
+ * Used by the isolated E2E/sandbox server (scripts/e2e-server.mjs) only — never run it against the real database.
  */
 export async function seedDemoData(sql, { adminPhone } = {}) {
   const brands = ["Bayer CropScience", "Dhanuka Agritech", "UPL Limited"];
