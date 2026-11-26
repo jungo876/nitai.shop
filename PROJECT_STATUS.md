@@ -89,11 +89,13 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 
 ## 5. Owner to-do list
 
+> ⏳ **Due work (postponed by owner):** SMS/DLT registration — see item 3. The site cannot go live for customers without it.
+
 | # | Item | Needed for | Status |
 |---|---|---|---|
 | 1 | **Reset the database password** (it was pasted in chat), then put the **Transaction pooler** URI (port 6543) in `.env.local` as `DATABASE_URL` (`npm run check-env` currently reports a *direct* connection) | Launch | ⏸ |
 | 2 | Confirm `SUPABASE_SECRET_KEY` is a new key and the one pasted in chat is deleted | Launch | ⏸ |
-| 3 | Choose SMS provider (MSG91 suggested) and start DLT registration | Launch | ⏸ (lead time: days) |
+| 3 | **DUE — SMS login codes: DLT registration + MSG91** (steps in docs/DEPLOYMENT.md §0). Postponed by owner on 2026-11-26 (no budget yet; DLT fee ≈ ₹5,900/yr + ~₹0.25/SMS). **Blocks launch:** until it is done customers cannot receive login codes on the live site. Short-term alternative: Twilio Verify (no own DLT, ≈ ₹5–10 per code). | Launch | ⏳ **DUE** |
 | 4 | Razorpay live-mode KYC | Launch | ⏸ (lead time: days) |
 | 5 | Create the Netlify site and move the domain (docs/DEPLOYMENT.md steps 3–4) | Launch | ⏸ after audit |
 | 6 | Fill Admin → Settings (business name, address, phone, email); **review the policy pages** (/terms, /privacy, /refund-policy, /shipping-policy) | Launch / KYC | ⏸ |

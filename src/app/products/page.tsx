@@ -10,6 +10,7 @@ import Link from "next/link";
 function ProductsContent() {
   const searchParams = useSearchParams();
   const homeCategory = searchParams.get("home_category");
+  const search = searchParams.get("search")?.trim() || null;
 
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ function ProductsContent() {
         params.set("limit", "12");
         params.set("offset", "0");
         if (homeCategory) params.set("home_category", homeCategory);
+        if (search) params.set("search", search);
 
         const res = await fetch(`/api/products?${params.toString()}`);
         const data = await res.json();
@@ -39,7 +41,7 @@ function ProductsContent() {
       }
     }
     fetchProducts();
-  }, [homeCategory]);
+  }, [homeCategory, search]);
 
   async function handleLoadMore() {
     setFetchingMore(true);
@@ -49,6 +51,7 @@ function ProductsContent() {
       params.set("limit", "12");
       params.set("offset", String(nextOffset));
       if (homeCategory) params.set("home_category", homeCategory);
+      if (search) params.set("search", search);
 
       const res = await fetch(`/api/products?${params.toString()}`);
       const data = await res.json();
@@ -83,7 +86,7 @@ function ProductsContent() {
             </Link>
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-foreground truncate">
-                {homeCategory || "All Products"}
+                {search ? `Results for “${search}”` : homeCategory || "All Products"}
               </h1>
               {homeCategory && (
                 <p className="text-xs text-muted">

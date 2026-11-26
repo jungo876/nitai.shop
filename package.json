@@ -20,7 +20,9 @@
     "admin:list": "node scripts/admin.mjs list",
     "admin:grant": "node scripts/admin.mjs grant",
     "admin:revoke": "node scripts/admin.mjs revoke",
-    "sandbox": "next build && node scripts/e2e-server.mjs --sandbox"
+    "sandbox": "next build && node scripts/e2e-server.mjs --sandbox",
+    "samples:add": "node scripts/sample-products.mjs add",
+    "samples:hide": "node scripts/sample-products.mjs hide"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.0.8",

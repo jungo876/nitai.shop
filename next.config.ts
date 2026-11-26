@@ -43,7 +43,14 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    // Private pages: never shown in search results.
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      ...["/admin/:path*", "/admin", "/account/:path*", "/account", "/cart", "/checkout", "/orders/:path*", "/orders", "/wishlist", "/api/:path*"].map(
+        (source) => ({ source, headers: noindex })
+      ),
+    ];
   },
 };
 

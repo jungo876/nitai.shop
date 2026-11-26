@@ -47,7 +47,7 @@ export async function listProducts(f: ProductFilters = {}, sql: Queryable = db()
                                   'price_per_unit', b.price_per_unit, 'tag', b.tag, 'created_at', b.created_at)
                                 order by b.box_count)
                          from bulk_prices b where b.variant_id = v.id), '[]'::jsonb))
-                    order by v.created_at, v.id)
+                    order by v.created_at, v.unit_price, v.id)
              from product_variants v where v.product_id = p.id), '[]'::jsonb) as product_variants
     from products p
     left join companies c on c.id = p.company_id

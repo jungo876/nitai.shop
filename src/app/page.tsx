@@ -166,6 +166,7 @@ export default function HomePage() {
 
   return (
     <>
+      <h1 className="sr-only">NCK Agro — wholesale pesticides, fungicides, herbicides and fertilisers online</h1>
       {/* Sticky Floating Search Bar */}
       <div
         className={`sticky z-40 px-3 sm:px-6 lg:px-8 transition-all duration-300 w-full ${isScrolled ? "top-[56px] md:top-[64px] py-2" : "top-[56px] md:top-[64px] py-3"}`}
@@ -389,6 +390,22 @@ export default function HomePage() {
           </section>
         </>
       )}
+
+      {/* About — plain text that tells search engines and new visitors what we sell */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10 pt-4">
+        <div className="rounded-2xl border border-card-border bg-card-bg p-5 sm:p-6">
+          <h2 className="text-base font-bold text-foreground">Wholesale agro inputs for dealers, retailers and farmers</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            NCK Agro supplies genuine insecticides, fungicides, herbicides, plant growth regulators and fertilisers from
+            leading brands at wholesale prices. Choose a pack size, buy by the box for bulk discounts, and pay securely online
+            — or confirm with a small advance and pay the rest on delivery (Cash on Delivery). Track every order under My
+            Orders. Need help choosing a product for your crop? Contact us on WhatsApp.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted" lang="bn">
+            কীটনাশক, ছত্রাকনাশক, আগাছানাশক ও সার — পাইকারি দামে অনলাইনে অর্ডার করুন। বক্স হিসেবে কিনলে আরও কম দাম।
+          </p>
+        </div>
+      </section>
     </>
   );
 }
