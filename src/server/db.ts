@@ -24,7 +24,8 @@ function create(url: string) {
     // Supabase's transaction pooler cannot keep named prepared statements.
     prepare: false,
     // Serverless functions each hold a small pool; the pooler multiplexes them.
-    max: e.DATABASE_POOL_MAX ?? (process.env.VERCEL ? 3 : 10),
+    // Vercel / Netlify (AWS Lambda) run many small instances, so keep each pool small.
+    max: e.DATABASE_POOL_MAX ?? (process.env.VERCEL || process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME ? 3 : 10),
     idle_timeout: 20,
     connect_timeout: 10,
     ssl,

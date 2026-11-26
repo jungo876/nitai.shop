@@ -68,8 +68,18 @@ export function assertSameOrigin(req: NextRequest) {
   if (site && site !== "same-origin" && site !== "none") throw forbidden("Cross-site request blocked.");
 }
 
+/**
+ * The visitor's IP (used for rate limits). Prefers headers set by the hosting
+ * platform that visitors cannot fake: Netlify's x-nf-client-connection-ip, then
+ * x-real-ip / x-forwarded-for (overwritten by Vercel).
+ */
 export function clientIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  return (
+    req.headers.get("x-nf-client-connection-ip")?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
 }
 
 /** Reads and validates a JSON body (size-limited). Throws HttpError on problems. */

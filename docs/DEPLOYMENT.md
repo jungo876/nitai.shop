@@ -1,24 +1,36 @@
 # Deploying NCK Agro (www.nitai.shop)
 
-Step-by-step guide to put the site live on **Vercel** with the **Supabase** database,
-**Razorpay** payments and **SMS login codes**. Follow it in order. Nothing here
-needs code changes.
+Step-by-step guide to put the site live on **Netlify** (free plan) with the **Supabase**
+database (free plan), **Razorpay** payments and **SMS login codes**. Follow it in order.
+Nothing here needs code changes. (Vercel works too — see the end.)
 
 > Secrets (passwords, keys) go **only** into `.env.local` on your computer and into
-> Vercel → Settings → Environment Variables. Never paste them into chat, email or Git.
+> Netlify → Environment variables. Never paste them into chat, email or Git.
 
 ---
 
-## 0. Accounts and monthly costs (decide first)
+## 0. Accounts and costs
 
-| Service | Plan | Why | Approx. cost |
+| Service | Plan | Notes | Cost |
 |---|---|---|---|
-| Vercel | **Pro** | Hobby is for non-commercial use only; Pro allows the order-cleanup job every 15 min | US$20 / month |
-| Supabase | **Pro** (recommended) | Free projects pause after a week without traffic and have no daily backups | US$25 / month |
-| Razorpay | Standard | Payments; needs KYC for live mode | ~2% per payment, no monthly fee |
-| SMS login codes | MSG91 (or Twilio) | Sends the 6-digit login code | MSG91 ≈ ₹0.20–0.30 per SMS + DLT registration |
-| Upstash Redis | Free tier | Shared rate limiting across servers (optional but recommended) | Free for this traffic |
-| Domain | nitai.shop | Already owned | — |
+| Netlify | **Free** | Business use allowed. 300 credits/month (see below) | ₹0 |
+| Supabase | **Free** | Business use allowed; 500 MB database, 1 GB images. No automatic backups → run `npm run db:backup` weekly | ₹0 |
+| Razorpay | Standard | Needs KYC for live mode | ~2% per payment |
+| SMS login codes | MSG91 (or Twilio) | Needs DLT registration | ≈ ₹0.20–0.30 per code |
+| Upstash Redis | Free | Optional: shared rate limiting | ₹0 |
+| Domain | nitai.shop | Already owned (GoDaddy) | — |
+
+### Netlify credits — read this
+The free plan has **300 credits a month**. **If they run out, Netlify shows "Site not
+available" until the next month.** What uses credits:
+
+- **Each production deploy: 15 credits.** Previews of other branches are free.
+  `netlify.toml` skips builds when only docs/tests change. Batch changes: ~5 deploys a month = 75.
+- **Traffic: 20 credits per GB.** A few hundred visits ≈ 0.5–1 GB ≈ 10–20 credits.
+- **Server work: 10 credits per GB-hour** (logins, cart, orders, the hourly cleanup) — a few credits at this size.
+
+Expected: **~80–150 credits/month**. Check **Netlify → Team → Usage & billing** weekly.
+When the shop grows, Netlify Pro (~US$20/month) removes the worry.
 
 ### SMS provider (needed before customers can log in)
 Indian SMS needs **DLT registration** (takes a few days):
@@ -46,9 +58,9 @@ npm run db:status          # should list 3 migrations as "applied" and say "Data
 npm run db:backup          # saves a full copy to backups/ (do this before every release)
 ```
 
-**Connection string for Vercel:** Supabase → *Connect* → **Transaction pooler** (port **6543**).
+**Connection string:** Supabase → *Connect* → **Transaction pooler** (port **6543**).
 Put it in `.env.local` as `DATABASE_URL`, then run `npm run check-env` — it should say
-*"Supabase transaction pooler (good for Vercel); region: …"*. Note the region.
+*"Supabase transaction pooler (good for Vercel); region: …"* (same for Netlify).
 
 If you pasted the database password anywhere (chat, email), first reset it:
 Supabase → Project Settings → Database → *Reset database password*, then update `DATABASE_URL`.
@@ -72,12 +84,15 @@ Keep `SESSION_SECRET` the same forever — changing it logs everybody out.
 
 ---
 
-## 3. Vercel settings
+## 3. Create the Netlify site
 
-Vercel → your `nitai.shop` project → **Settings**.
-
-### Environment Variables
-Add these for the **Production** environment (names are listed in `.env.example`):
+1. Sign up at netlify.com (free) with your GitHub account.
+2. **Add new project → Import an existing project → GitHub → `jungo876/nitai.shop`.**
+3. **Branch to deploy:** `main` (after step 5's merge). To try the new version first,
+   pick `production-readiness`; switch to `main` later in Project configuration → Build & deploy → Branches.
+4. Build settings are read from `netlify.toml` — leave them as they are.
+5. **Before the first deploy, add the environment variables** (button on the same screen,
+   or later in Project configuration → Environment variables). Mark secrets as **secret**:
 
 | Name | Value |
 |---|---|
@@ -94,31 +109,47 @@ Add these for the **Production** environment (names are listed in `.env.example`
 | `MSG91_AUTH_KEY`, `MSG91_TEMPLATE_ID` | from MSG91 |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | optional, from Upstash |
 
-**Delete the old variables** the previous version used: `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`ADMIN_PASSWORD`, `NEXT_PUBLIC_RAZORPAY_KEY_ID`.
-
-For **Preview** deployments (to test before going live) use the same names but:
-`APP_ENV=staging`, Razorpay **test** keys (`rzp_test_…`), and `APP_URL` = the preview URL.
-With `APP_ENV=staging`, `OTP_PROVIDER=console` is allowed: login codes then appear in
-Vercel → Logs instead of by SMS (handy before SMS is approved).
+**Trying it before SMS and Razorpay KYC are ready?** Add `APP_ENV=staging`, use Razorpay
+**test** keys and `OTP_PROVIDER=console`. Login codes then appear in Netlify → Logs →
+Functions instead of by SMS. Change these back before real customers use the site.
 
 > The server **refuses to start in production** if anything required is missing or
-> unsafe (test payment key, `console` login codes, http URL…). The reason is in
-> Vercel → Logs as `config_error`. Run `npm run check-env -- --prod` locally to check.
+> unsafe (test payment key, `console` login codes, http URL…) and shows an error page.
+> The reason is in Netlify → Logs → Functions as `config_error`.
+> Run `npm run check-env -- --prod` locally to check first.
 
-### Functions region
-Settings → Functions → **Function Region**: choose the one closest to your Supabase
-region (Supabase → Project Settings → General). E.g. Supabase `ap-south-1` (Mumbai) →
-Vercel **Mumbai (bom1)**; Supabase `ap-southeast-1` (Singapore) → **Singapore (sin1)**.
+6. Deploy. When it says **Published**, open the `https://<name>.netlify.app` address and
+   check the shop works (step 6's list) **before** moving the domain.
 
-### Cron job
-`vercel.json` runs `/api/cron/expire-orders` once a day (works on every plan). It cancels
-checkouts that were never paid and deletes old login codes. **On Vercel Pro**, change the
-schedule in `vercel.json` to every 15 minutes: `"schedule": "*/15 * * * *"`.
+### Functions region (speed)
+Netlify runs the server part in the USA (Ohio) by default. Your database is in Supabase's
+region (Supabase → Project Settings → General). If Netlify lets you choose (Project
+configuration → Build & deploy → Functions region), pick the closest one (Mumbai or
+Singapore) and redeploy. If the free plan doesn't allow it, the site still works but pages
+that load data are somewhat slower (each database query travels to the USA and back).
+
+### Hourly cleanup job
+`netlify/functions/expire-orders.mts` runs every hour on Netlify automatically. It cancels
+checkouts not paid within 30 minutes and deletes old login codes. You can see it under
+Netlify → Logs → Functions → `expire-orders`. (`vercel.json` is only used on Vercel.)
 
 ---
 
-## 4. Razorpay webhook
+## 4. Move the domain (www.nitai.shop) to Netlify
+
+Do this only after the `.netlify.app` address works.
+
+1. Netlify → Domain management → **Add a domain** → `www.nitai.shop` (also add `nitai.shop`).
+2. GoDaddy → nitai.shop → **DNS**:
+   - Change the `www` **CNAME** to `<your-site>.netlify.app`
+   - Change the `@` **A** record to the IP Netlify shows you (Netlify's load balancer)
+   - Remove the old Vercel records (`cname.vercel-dns.com`, `76.76.21.21`)
+3. Wait up to a few hours. Netlify adds the free HTTPS certificate automatically.
+4. Then remove the domain from the old Vercel project (or delete that project).
+
+---
+
+## 5. Razorpay webhook
 
 Razorpay Dashboard (**Live** mode) → Account & Settings → **Webhooks** → Add new webhook:
 
@@ -127,32 +158,30 @@ Razorpay Dashboard (**Live** mode) → Account & Settings → **Webhooks** → A
 - Events: **payment.captured**, **payment.failed**, **order.paid**
 
 The webhook confirms an order even if the customer closes the browser right after paying.
-Do the same in **Test** mode with the preview URL if you test on a preview deployment.
 
 ---
 
-## 5. Release
+## 6. Release
 
 1. `npm run db:backup`
-2. Merge the `production-readiness` branch into `main` (pull request on GitHub). CI must be green.
-3. Vercel deploys `main` to production automatically. Wait for "Ready".
+2. Merge `production-readiness` into `main` (pull request on GitHub). The CI check must be green.
+3. Netlify builds `main` and publishes it automatically (15 credits).
 
----
-
-## 6. Checks right after going live (10 minutes)
+### Checks right after going live (10 minutes)
 
 | # | Check | Expected |
 |---|---|---|
 | 1 | Open https://www.nitai.shop | Home page with your products |
-| 2 | Vercel → Logs, filter `config_` | `config_ok` (no `config_error`) |
+| 2 | Netlify → Logs → Functions, search `config_` | `config_ok` (no `config_error`) |
 | 3 | Log in with your phone | SMS code arrives; you are logged in |
 | 4 | Open `/admin` | Admin dashboard (if your number is an admin) |
 | 5 | Admin → Products → edit a product, upload an image | Image shows on the product |
 | 6 | Admin → Settings | Business name, address, phone, email filled in; store **Open** |
 | 7 | Place a real order for a cheap item, pay by UPI | "Thank you! Your order is placed." Order shows in Admin → Orders with a NEW badge |
-| 8 | Razorpay → Payments | The payment is **captured**; then **refund** it from Razorpay if it was only a test |
+| 8 | Razorpay → Payments | The payment is **captured**; **refund** it from Razorpay if it was only a test |
 | 9 | Razorpay → Webhooks → your webhook | Recent deliveries succeeded (200) |
 | 10 | `/terms`, `/privacy`, `/refund-policy`, `/shipping-policy`, `/contact` | Pages open and show your details |
+| 11 | Next hour: Logs → Functions → `expire-orders` | `HTTP 200` |
 
 From your computer you can also run `npm run storage:smoke` (image upload check).
 
@@ -160,19 +189,20 @@ From your computer you can also run `npm run storage:smoke` (image upload check)
 
 ## 7. If something goes wrong (rollback)
 
-- **Website problem after a release:** Vercel → Deployments → pick the previous good
-  deployment → **⋯ → Instant Rollback**. Takes seconds; the database is not touched.
-- **Payments failing:** check Vercel Logs for `razorpay_` errors. A payment that reaches
+- **Website problem after a release:** Netlify → Deploys → pick the previous good deploy →
+  **Publish deploy**. Takes seconds and uses no credits; the database is not touched.
+- **"Site not available":** the monthly credits ran out — see Usage & billing. Wait for the
+  next month or upgrade to Pro.
+- **Payments failing:** check the function logs for `razorpay_` errors. A payment that reaches
   Razorpay is matched to its order by the webhook even if the customer's browser closed
   (also after the 30-minute payment window — the order is then revived). If you ever see a
   captured payment in Razorpay with no confirmed order, refund it from the Razorpay dashboard.
 - **Store must stop taking orders** (stock issue, holiday): Admin → Settings → Store status
   **Closed** with a message. Browsing still works.
 - **Database restore** (last resort): backups made with `npm run db:backup` are in
-  `backups/`. Supabase Pro also keeps daily backups (Supabase → Database → Backups).
-  Ask a developer before restoring — it overwrites newer orders.
+  `backups/`. Ask a developer before restoring — it overwrites newer orders.
 
-Every error shown to a customer has a reference id; search for it in Vercel → Logs.
+Every error shown to a customer has a reference id; search for it in the function logs.
 Useful log messages: `unhandled_error`, `payment_signature_invalid`,
 `webhook_payment_not_confirmed`, `otp_send_failed`, `storage_upload_failed`.
 
@@ -180,7 +210,18 @@ Useful log messages: `unhandled_error`, `payment_signature_invalid`,
 
 ## 8. Routine
 
-- Before each release: `npm run db:backup`.
+- **Weekly:** `npm run db:backup` (Supabase Free has no automatic backups) and check
+  Netlify credits (Team → Usage & billing).
 - Weekly: Admin → Orders → check nothing is stuck in "Payment pending".
 - Keep the policy pages up to date when your delivery or refund rules change
   (`src/app/*-policy/page.tsx`, `src/app/terms`, `src/app/privacy`).
+
+---
+
+## Using Vercel instead
+
+Everything above applies, except: set the environment variables in Vercel → Settings →
+Environment Variables; the cleanup job comes from `vercel.json` (daily on Hobby; change to
+`*/15 * * * *` on Pro); choose Settings → Functions → Function Region near Supabase
+(e.g. Mumbai `bom1`); roll back via Deployments → Instant Rollback. Note: Vercel's free
+Hobby plan is for **non-commercial** use only, so a shop needs Vercel Pro.

@@ -34,7 +34,7 @@ Branch `production-readiness` is **local only** (not pushed).
 6. Final production-readiness audit: route-by-route authorization review, banner link
    validation, health endpoint (optional), `npm audit`, review lint warnings, check
    README/DEPLOYMENT accuracy. Then **ask the owner** before pushing to GitHub (a push
-   triggers a Vercel preview build and CI) and before any production deploy.
+   triggers CI) and before any production deploy. Branch pushed to GitHub 2026-11-26 (owner request); CI green.
 
 ## 3. Decisions
 
@@ -45,7 +45,8 @@ Branch `production-readiness` is **local only** (not pushed).
 | Login verification | Build phone-OTP login with pluggable providers; dev mode logs the code. **Owner picks the SMS/WhatsApp provider before launch.** |
 | GST invoices | **Undecided** — open launch item. Checkout no longer promises GST invoices (says the GST number is saved with each order). |
 | New-order alerts | Admin dashboard only, with a "new" badge. No email/WhatsApp. |
-| Domain | `nitai.shop` (GoDaddy DNS → Vercel; apex redirects to `www.nitai.shop`). |
+| Domain | `nitai.shop` (GoDaddy DNS; currently → Vercel, old version). |
+| Hosting | **Netlify Free + Supabase Free** to start (owner choice 2026-11-26; ₹0 fixed cost). Netlify free = 300 credits/month, site pauses if exceeded; move to Pro when the shop grows. Render rejected (sleeps when idle). Vercel Hobby rejected (non-commercial only). |
 
 ### Engineering decisions (ADRs)
 1. **Server-only database access with a direct Postgres connection** (`postgres`
@@ -94,7 +95,7 @@ Legend: ✅ done · 🔄 in progress · ⬜ not started · ⏸ blocked on owner
 | 2 | Confirm `SUPABASE_SECRET_KEY` is a new key and the one pasted in chat is deleted | Launch | ⏸ |
 | 3 | Choose SMS provider (MSG91 suggested) and start DLT registration | Launch | ⏸ (lead time: days) |
 | 4 | Razorpay live-mode KYC | Launch | ⏸ (lead time: days) |
-| 5 | Hosting budget: Vercel Pro (Hobby is non-commercial), Supabase Pro (recommended) | Launch | ⏸ decision |
+| 5 | Create the Netlify site and move the domain (docs/DEPLOYMENT.md steps 3–4) | Launch | ⏸ after audit |
 | 6 | Fill Admin → Settings (business name, address, phone, email); **review the policy pages** (/terms, /privacy, /refund-policy, /shipping-policy) | Launch / KYC | ⏸ |
 | 7 | Enter real products, prices and images; delete test products | Launch | ⏸ |
 | 8 | Decide on GST invoices | Launch | ⏸ decision |
