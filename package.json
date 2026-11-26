@@ -15,7 +15,8 @@
     "db:status": "node scripts/migrate.mjs --status",
     "db:backup": "node scripts/db-backup.mjs",
     "test:e2e": "next build && playwright test",
-    "test:e2e:only": "playwright test"
+    "test:e2e:only": "playwright test",
+    "storage:smoke": "node scripts/storage-smoke.mjs"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.0.8",
