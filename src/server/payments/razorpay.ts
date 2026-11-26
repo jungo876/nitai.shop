@@ -29,16 +29,22 @@ export interface RazorpayPayment {
 }
 
 function authHeader() {
+  // A test key in production would let "payments" with Razorpay test cards confirm real orders.
+  if (env().isProduction && requireEnv("RAZORPAY_KEY_ID").startsWith("rzp_test_")) {
+    log.error("razorpay_test_key_in_production");
+    throw new HttpError(503, "Online payment is not available right now. Please contact us to order.", "payment_not_configured");
+  }
   return "Basic " + Buffer.from(`${requireEnv("RAZORPAY_KEY_ID")}:${requireEnv("RAZORPAY_KEY_SECRET")}`).toString("base64");
 }
 
 async function call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
   const url = env().RAZORPAY_API_BASE.replace(/\/$/, "") + path;
+  const headers = { Authorization: authHeader(), "Content-Type": "application/json" }; // may throw a config error
   let res: Response;
   try {
     res = await fetch(url, {
       method,
-      headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     });

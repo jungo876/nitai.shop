@@ -30,7 +30,12 @@ const consoleProvider: OtpProvider = {
   kind: "local",
   name: "console",
   async deliver(phone10, code) {
-    // Development only: the code is printed to the server terminal.
+    // Development only: the code is printed to the server terminal. Never in production,
+    // where server logs are not private and nobody would receive the SMS.
+    if (env().isProduction) {
+      log.error("otp_console_provider_in_production", { phone: maskPhone(phone10) });
+      throw new ProviderError("Login by SMS is not set up yet.");
+    }
     console.log(`\n[DEV OTP] Login code for +91 ${phone10}: ${code}\n`);
     const outbox = env().OTP_CONSOLE_OUTBOX;
     if (outbox) appendFileSync(outbox, JSON.stringify({ phone: phone10, code, at: new Date().toISOString() }) + "\n");

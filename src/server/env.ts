@@ -126,10 +126,14 @@ export function sessionSecret(): string {
   return DEV_SESSION_SECRET;
 }
 
-/** Everything a production deployment needs. Empty array = ready. */
-export function productionConfigProblems(): string[] {
+/**
+ * Everything a production deployment needs. `errors` stop the server from
+ * starting (see src/instrumentation.ts); `warnings` are logged.
+ */
+export function productionConfigProblems(): { errors: string[]; warnings: string[] } {
   const e = env();
   const problems: string[] = [];
+  const warnings: string[] = [];
   const need = (key: EnvKey, why: string) => {
     if (!e[key]) problems.push(`${key} is required (${why})`);
   };
@@ -156,7 +160,7 @@ export function productionConfigProblems(): string[] {
   if (e.RAZORPAY_KEY_ID?.startsWith("rzp_test_")) problems.push("RAZORPAY_KEY_ID is a TEST key (rzp_test_…)");
   if (e.APP_URL && !e.APP_URL.startsWith("https://")) problems.push("APP_URL must use https://");
   if (!e.UPSTASH_REDIS_REST_URL || !e.UPSTASH_REDIS_REST_TOKEN) {
-    problems.push("UPSTASH_REDIS_REST_URL/TOKEN not set — general API rate limiting will be per-instance only (warning)");
+    warnings.push("UPSTASH_REDIS_REST_URL/TOKEN not set — general API rate limiting is per server instance only");
   }
-  return problems;
+  return { errors: problems, warnings };
 }

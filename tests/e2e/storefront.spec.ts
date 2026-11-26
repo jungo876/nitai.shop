@@ -75,4 +75,23 @@ test.describe("guest browsing", () => {
     }
     await expect(page.getByText("Howrah, West Bengal").first()).toBeVisible();
   });
+
+  test("security headers are sent and pages break no security rules", async ({ page }) => {
+    const violations: string[] = [];
+    page.on("console", (m) => {
+      if (/Content Security Policy|Refused to/i.test(m.text())) violations.push(m.text());
+    });
+    const res = await page.goto("/");
+    const h = res!.headers();
+    expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
+    expect(h["x-content-type-options"]).toBe("nosniff");
+    expect(h["x-frame-options"]).toBe("DENY");
+    expect(h["x-powered-by"]).toBeUndefined();
+    await expect(page.getByText("Confidor Imidacloprid 17.8% SL").first()).toBeVisible();
+    await page.getByText("Confidor Imidacloprid 17.8% SL").first().click();
+    await expect(page.getByRole("button", { name: /Buy Now/ })).toBeVisible();
+    await page.goto("/contact");
+    await expect(page.getByText("support@nitai.shop").first()).toBeVisible();
+    expect(violations).toEqual([]);
+  });
 });
